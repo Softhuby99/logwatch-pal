@@ -73,6 +73,7 @@ const InternalAuthProblems = () => {
     { key: "organisation", label: "organisation / ASN" },
     { key: "land", label: "land" },
     { key: "ptr", label: "PTR" },
+    { key: "ziel_port", label: "ziel_port" },
   ];
 
   return (
