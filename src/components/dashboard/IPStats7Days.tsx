@@ -223,7 +223,11 @@ const IPStats7Days = () => {
                     <TableCell className="text-muted-foreground px-3 py-2">{formatTime(ip.first_seen)}</TableCell>
                     <TableCell className="text-muted-foreground px-3 py-2">{formatTime(ip.last_seen)}</TableCell>
                     <TableCell className="text-muted-foreground px-3 py-2">{ip.last_target_email || "-"}</TableCell>
-                    <TableCell className="text-muted-foreground px-3 py-2">{ip.last_event_type}</TableCell>
+                    <TableCell className="px-3 py-2">
+                      <Badge variant="outline" className={`text-[10px] px-1.5 font-mono ${eventTypeClass(ip.last_event_type)}`}>
+                        {ip.last_event_type}
+                      </Badge>
+                    </TableCell>
                   </TableRow>
                 ))
               )}
