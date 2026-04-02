@@ -5,6 +5,7 @@ import TopAttackers from "@/components/dashboard/TopAttackers";
 import CrowdSecAlerts from "@/components/dashboard/CrowdSecAlerts";
 import EventFeed from "@/components/dashboard/EventFeed";
 import SourceBreakdown from "@/components/dashboard/SourceBreakdown";
+import AttackTimelineChart from "@/components/dashboard/AttackTimelineChart";
 import IPStats7Days from "@/components/dashboard/IPStats7Days";
 import AggressiveIPs30Days from "@/components/dashboard/AggressiveIPs30Days";
 import InternalAuthProblems from "@/components/dashboard/InternalAuthProblems";
@@ -34,6 +35,10 @@ const Index = () => (
     {/* Dashboard */}
     <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
       <StatsCards />
+
+      <CollapsiblePanel title="Attack Timeline">
+        <AttackTimelineChart />
+      </CollapsiblePanel>
 
       <CollapsiblePanel title="Auth Timeline & Quellen">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
