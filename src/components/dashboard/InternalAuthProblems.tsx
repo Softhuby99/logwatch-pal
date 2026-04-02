@@ -69,6 +69,9 @@ const InternalAuthProblems = () => {
     { key: "username", label: "username" },
     { key: "login_type", label: "login_type" },
     { key: "last_seen", label: "last_seen" },
+    { key: "organisation", label: "organisation / ASN" },
+    { key: "land", label: "land" },
+    { key: "ptr", label: "PTR" },
   ];
 
   return (
