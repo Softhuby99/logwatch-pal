@@ -174,16 +174,16 @@ const days = (d: number) => {
 };
 
 export const mockAggressiveIPs30Days: AggressiveIP30Days[] = [
-  { ip: "18.218.118.203", treffer: 117, level: "WARN", quelle: "postfix", grund: "Warning", konto: null, last_seen: days(0), letzte_meldung: "CRIT: Banning 18.218.118.203/32 for 960 minutes" },
-  { ip: "134.209.244.59", treffer: 10, level: "WARN", quelle: "postfix", grund: "improper_command_pipelining", konto: null, last_seen: days(1), letzte_meldung: "postfix/submission/smtpd[50857]: improper command pipelining after CONNECT" },
-  { ip: "3.131.220.121", treffer: 12, level: "WARN", quelle: "postfix", grund: "non_smtp_command", konto: null, last_seen: days(1), letzte_meldung: "INFO: Unbanning 3.131.220.121/32" },
-  { ip: "18.116.101.220", treffer: 62, level: "WARN", quelle: "postfix", grund: "unbanning", konto: null, last_seen: days(2), letzte_meldung: "INFO: Unbanning 18.116.101.220/32" },
-  { ip: "34.193.119.44", treffer: 15, level: "WARN", quelle: "postfix", grund: "unbanning", konto: null, last_seen: days(2), letzte_meldung: "WARN: 34.193.119.44 matched rule id 4 (warning: non-SMTP command from ec2-34-...)" },
-  { ip: "45.141.84.91", treffer: 89, level: "CRIT", quelle: "netfilter", grund: "banning", konto: "info@example.com", last_seen: days(3), letzte_meldung: "netfilter: banning 45.141.84.91 for brute-force SMTP" },
-  { ip: "193.56.29.44", treffer: 45, level: "CRIT", quelle: "netfilter", grund: "banning", konto: null, last_seen: days(5), letzte_meldung: "netfilter: banning 193.56.29.44 - repeated auth failures" },
-  { ip: "89.248.163.200", treffer: 33, level: "CRIT", quelle: "crowdsec", grund: "ssh_bruteforce", konto: null, last_seen: days(7), letzte_meldung: "crowdsec: ban 89.248.163.200 SSH bruteforce" },
-  { ip: "162.142.125.40", treffer: 21, level: "WARN", quelle: "crowdsec", grund: "http_probing", konto: null, last_seen: days(10), letzte_meldung: "crowdsec: ban 162.142.125.40 HTTP sensitive files" },
-  { ip: "5.188.206.14", treffer: 18, level: "WARN", quelle: "postfix", grund: "lost_connection_after_auth", konto: null, last_seen: days(14), letzte_meldung: "postfix: lost connection after AUTH from 5.188.206.14" },
+  { ip: "18.218.118.203", treffer: 117, level: "WARN", quelle: "postfix", grund: "Warning", konto: null, last_seen: days(0), letzte_meldung: "CRIT: Banning 18.218.118.203/32 for 960 minutes", organisation: "Amazon AWS", land: "US", ptr: "-" },
+  { ip: "134.209.244.59", treffer: 10, level: "WARN", quelle: "postfix", grund: "improper_command_pipelining", konto: null, last_seen: days(1), letzte_meldung: "postfix/submission/smtpd[50857]: improper command pipelining after CONNECT", organisation: "DigitalOcean", land: "NL", ptr: "-" },
+  { ip: "3.131.220.121", treffer: 12, level: "WARN", quelle: "postfix", grund: "non_smtp_command", konto: null, last_seen: days(1), letzte_meldung: "INFO: Unbanning 3.131.220.121/32", organisation: "Amazon AWS", land: "US", ptr: "-" },
+  { ip: "18.116.101.220", treffer: 62, level: "WARN", quelle: "postfix", grund: "unbanning", konto: null, last_seen: days(2), letzte_meldung: "INFO: Unbanning 18.116.101.220/32", organisation: "Amazon AWS", land: "US", ptr: "-" },
+  { ip: "34.193.119.44", treffer: 15, level: "WARN", quelle: "postfix", grund: "unbanning", konto: null, last_seen: days(2), letzte_meldung: "WARN: 34.193.119.44 matched rule id 4", organisation: "Amazon AWS", land: "US", ptr: "-" },
+  { ip: "45.141.84.91", treffer: 89, level: "CRIT", quelle: "netfilter", grund: "banning", konto: "info@example.com", last_seen: days(3), letzte_meldung: "netfilter: banning 45.141.84.91 for brute-force SMTP", organisation: "unbekannt", land: "RU", ptr: "-" },
+  { ip: "193.56.29.44", treffer: 45, level: "CRIT", quelle: "netfilter", grund: "banning", konto: null, last_seen: days(5), letzte_meldung: "netfilter: banning 193.56.29.44 - repeated auth failures", organisation: "unbekannt", land: "UA", ptr: "-" },
+  { ip: "89.248.163.200", treffer: 33, level: "CRIT", quelle: "crowdsec", grund: "ssh_bruteforce", konto: null, last_seen: days(7), letzte_meldung: "crowdsec: ban 89.248.163.200 SSH bruteforce", organisation: "Censys Inc.", land: "US", ptr: "scanner.censys.io" },
+  { ip: "162.142.125.40", treffer: 21, level: "WARN", quelle: "crowdsec", grund: "http_probing", konto: null, last_seen: days(10), letzte_meldung: "crowdsec: ban 162.142.125.40 HTTP sensitive files", organisation: "Censys Inc.", land: "US", ptr: "scanner.censys.io" },
+  { ip: "5.188.206.14", treffer: 18, level: "WARN", quelle: "postfix", grund: "lost_connection_after_auth", konto: null, last_seen: days(14), letzte_meldung: "postfix: lost connection after AUTH from 5.188.206.14", organisation: "EstNOC OY", land: "EE", ptr: "-" },
 ];
 
 // Internal auth/password problems (30 days)
