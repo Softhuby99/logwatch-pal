@@ -8,6 +8,7 @@ import SourceBreakdown from "@/components/dashboard/SourceBreakdown";
 import IPStats7Days from "@/components/dashboard/IPStats7Days";
 import AggressiveIPs30Days from "@/components/dashboard/AggressiveIPs30Days";
 import InternalAuthProblems from "@/components/dashboard/InternalAuthProblems";
+import CollapsiblePanel from "@/components/dashboard/CollapsiblePanel";
 
 const Index = () => (
   <div className="min-h-screen bg-background text-foreground">
@@ -34,25 +35,37 @@ const Index = () => (
     <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
       <StatsCards />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <AuthTimeline />
+      <CollapsiblePanel title="Auth Timeline & Quellen">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <AuthTimeline />
+          </div>
+          <SourceBreakdown />
         </div>
-        <SourceBreakdown />
-      </div>
+      </CollapsiblePanel>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <TopAttackers />
-        <CrowdSecAlerts />
-      </div>
+      <CollapsiblePanel title="Top Angreifer & CrowdSec">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <TopAttackers />
+          <CrowdSecAlerts />
+        </div>
+      </CollapsiblePanel>
 
-      <IPStats7Days />
+      <CollapsiblePanel title="IP Statistik 7 Tage">
+        <IPStats7Days />
+      </CollapsiblePanel>
 
-      <AggressiveIPs30Days />
+      <CollapsiblePanel title="Aggressive IPs 30 Tage">
+        <AggressiveIPs30Days />
+      </CollapsiblePanel>
 
-      <InternalAuthProblems />
+      <CollapsiblePanel title="Interne Auth-Probleme 30 Tage">
+        <InternalAuthProblems />
+      </CollapsiblePanel>
 
-      <EventFeed />
+      <CollapsiblePanel title="Event Feed">
+        <EventFeed />
+      </CollapsiblePanel>
     </main>
   </div>
 );
