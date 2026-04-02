@@ -54,7 +54,7 @@ const AggressiveIPs30Days = () => {
       const vals: Record<string, string> = {
         ip: row.ip, treffer: String(row.treffer), level: row.level, quelle: row.quelle,
         grund: row.grund, konto: row.konto || "-", last_seen: formatTime(row.last_seen),
-        letzte_meldung: row.letzte_meldung, organisation: row.organisation, land: row.land, ptr: row.ptr,
+        letzte_meldung: row.letzte_meldung, organisation: row.organisation, land: row.land, ptr: row.ptr, ziel_port: row.ziel_port,
       };
       return Object.entries(filters).every(([key, search]) => !search || vals[key]?.toLowerCase().includes(search.toLowerCase()));
     });
