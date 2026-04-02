@@ -6,7 +6,7 @@ import { format } from "date-fns";
 import { ChevronDown, ChevronUp, Filter, Info } from "lucide-react";
 
 type SortDir = "asc" | "desc" | null;
-type SortKey = "ip" | "failed_logins" | "username" | "login_type" | "last_seen" | "organisation" | "land" | "ptr";
+type SortKey = "ip" | "failed_logins" | "username" | "login_type" | "last_seen" | "organisation" | "land" | "ptr" | "ziel_port";
 
 const InternalAuthProblems = () => {
   const [filters, setFilters] = useState<Record<string, string>>({});
