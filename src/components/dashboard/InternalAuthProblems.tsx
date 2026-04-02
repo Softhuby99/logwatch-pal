@@ -140,6 +140,7 @@ const InternalAuthProblems = () => {
                   <TableCell className="text-muted-foreground px-3 py-2">{row.organisation}</TableCell>
                   <TableCell className="text-muted-foreground px-3 py-2">{row.land}</TableCell>
                   <TableCell className="text-muted-foreground px-3 py-2">{row.ptr}</TableCell>
+                  <TableCell className="text-muted-foreground px-3 py-2">{row.ziel_port}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
