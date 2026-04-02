@@ -5,6 +5,7 @@ import TopAttackers from "@/components/dashboard/TopAttackers";
 import CrowdSecAlerts from "@/components/dashboard/CrowdSecAlerts";
 import EventFeed from "@/components/dashboard/EventFeed";
 import SourceBreakdown from "@/components/dashboard/SourceBreakdown";
+import IPStats7Days from "@/components/dashboard/IPStats7Days";
 
 const Index = () => (
   <div className="min-h-screen bg-background text-foreground">
