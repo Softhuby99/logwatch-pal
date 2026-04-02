@@ -143,12 +143,12 @@ export const authFailureTimeline = Array.from({ length: 24 }, (_, i) => {
   };
 });
 
-// Events per source for pie/bar
+// Events per source for pie/bar (with time comparisons)
 export const eventsBySource = [
-  { source: "Postfix", count: 42, fill: "hsl(0 84% 60%)" },
-  { source: "Netfilter", count: 28, fill: "hsl(38 92% 50%)" },
-  { source: "Dovecot", count: 15, fill: "hsl(217 91% 60%)" },
-  { source: "CrowdSec", count: 7, fill: "hsl(142 71% 45%)" },
+  { source: "Postfix", h24: 42, d7: 189, d30: 623, fill: "hsl(0 84% 60%)", fillMid: "hsl(0 84% 45%)", fillLight: "hsl(0 84% 32%)" },
+  { source: "Netfilter", h24: 28, d7: 134, d30: 487, fill: "hsl(38 92% 50%)", fillMid: "hsl(38 92% 38%)", fillLight: "hsl(38 92% 26%)" },
+  { source: "Dovecot", h24: 15, d7: 78, d30: 245, fill: "hsl(217 91% 60%)", fillMid: "hsl(217 91% 45%)", fillLight: "hsl(217 91% 32%)" },
+  { source: "CrowdSec", h24: 7, d7: 41, d30: 156, fill: "hsl(142 71% 45%)", fillMid: "hsl(142 71% 33%)", fillLight: "hsl(142 71% 22%)" },
 ];
 
 // Top aggressive external IPs (30 Days)
