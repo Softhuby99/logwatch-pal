@@ -73,6 +73,9 @@ const AggressiveIPs30Days = () => {
         case "konto": aVal = a.konto || ""; bVal = b.konto || ""; break;
         case "last_seen": aVal = new Date(a.last_seen).getTime(); bVal = new Date(b.last_seen).getTime(); break;
         case "letzte_meldung": aVal = a.letzte_meldung; bVal = b.letzte_meldung; break;
+        case "organisation": aVal = a.organisation; bVal = b.organisation; break;
+        case "land": aVal = a.land; bVal = b.land; break;
+        case "ptr": aVal = a.ptr; bVal = b.ptr; break;
       }
       if (aVal < bVal) return sortDir === "asc" ? -1 : 1;
       if (aVal > bVal) return sortDir === "asc" ? 1 : -1;
