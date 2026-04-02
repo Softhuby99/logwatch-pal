@@ -5,6 +5,7 @@ import TopAttackers from "@/components/dashboard/TopAttackers";
 import CrowdSecAlerts from "@/components/dashboard/CrowdSecAlerts";
 import EventFeed from "@/components/dashboard/EventFeed";
 import SourceBreakdown from "@/components/dashboard/SourceBreakdown";
+import AttackTimelineChart from "@/components/dashboard/AttackTimelineChart";
 import IPStats7Days from "@/components/dashboard/IPStats7Days";
 import AggressiveIPs30Days from "@/components/dashboard/AggressiveIPs30Days";
 import InternalAuthProblems from "@/components/dashboard/InternalAuthProblems";
