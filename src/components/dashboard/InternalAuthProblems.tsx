@@ -56,6 +56,7 @@ const InternalAuthProblems = () => {
         case "organisation": aVal = a.organisation; bVal = b.organisation; break;
         case "land": aVal = a.land; bVal = b.land; break;
         case "ptr": aVal = a.ptr; bVal = b.ptr; break;
+        case "ziel_port": aVal = a.ziel_port; bVal = b.ziel_port; break;
       }
       if (aVal < bVal) return sortDir === "asc" ? -1 : 1;
       if (aVal > bVal) return sortDir === "asc" ? 1 : -1;
