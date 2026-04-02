@@ -92,6 +92,9 @@ const AggressiveIPs30Days = () => {
     { key: "konto", label: "konto" },
     { key: "last_seen", label: "last_seen" },
     { key: "letzte_meldung", label: "letzte_meldung" },
+    { key: "organisation", label: "organisation / ASN" },
+    { key: "land", label: "land" },
+    { key: "ptr", label: "PTR" },
   ];
 
   return (
