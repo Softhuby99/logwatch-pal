@@ -1,10 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Input } from "@/components/ui/input";
 import { mockIPSummary } from "@/data/mockSecurityData";
 import { format } from "date-fns";
-import { Filter, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { ChevronDown, ChevronUp, Filter, Info } from "lucide-react";
 
 type SortDir = "asc" | "desc" | null;
 type SortKey = "ip" | "total_events" | "first_seen" | "last_seen" | "last_target_email" | "last_event_type";
@@ -14,6 +13,18 @@ const IPStats7Days = () => {
   const [openFilter, setOpenFilter] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("total_events");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const filterRef = useRef<HTMLDivElement>(null);
+
+  // Close filter dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (filterRef.current && !filterRef.current.contains(e.target as Node)) {
+        setOpenFilter(null);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   const formatTime = (iso: string) => {
     try {
@@ -25,8 +36,7 @@ const IPStats7Days = () => {
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
-      setSortDir(sortDir === "asc" ? "desc" : sortDir === "desc" ? null : "asc");
-      if (sortDir === null) setSortKey("total_events");
+      setSortDir(sortDir === "desc" ? "asc" : "desc");
     } else {
       setSortKey(key);
       setSortDir("desc");
@@ -40,7 +50,7 @@ const IPStats7Days = () => {
         total_events: String(row.total_events),
         first_seen: formatTime(row.first_seen),
         last_seen: formatTime(row.last_seen),
-        last_target_email: row.last_target_email || "–",
+        last_target_email: row.last_target_email || "-",
         last_event_type: row.last_event_type,
       };
       return Object.entries(filters).every(([key, search]) => {
@@ -69,85 +79,134 @@ const IPStats7Days = () => {
     });
   }, [filtered, sortKey, sortDir]);
 
-  const columns: { key: SortKey; label: string; align?: string }[] = [
+  const columns: { key: SortKey; label: string }[] = [
     { key: "ip", label: "ip" },
-    { key: "total_events", label: "treffer", align: "text-right" },
+    { key: "total_events", label: "treffer" },
     { key: "first_seen", label: "erstes_auftreten" },
     { key: "last_seen", label: "letztes_auftreten" },
     { key: "last_target_email", label: "haeufigstes_zielkonto" },
     { key: "last_event_type", label: "haeufigster_grund" },
   ];
 
-  const SortIcon = ({ col }: { col: SortKey }) => {
-    if (sortKey !== col || !sortDir) return <ArrowUpDown className="h-3 w-3 opacity-40" />;
-    return sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />;
-  };
-
   return (
-    <Card className="border-border/50 bg-card/80 backdrop-blur">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">
-          Statistik nach IP 7 Tage
-        </CardTitle>
+    <Card className="border-border/50 bg-card/80 backdrop-blur rounded-none border-0 border-t border-border/30">
+      {/* Grafana-style panel header */}
+      <CardHeader className="px-4 py-2 border-b border-border/30">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CardTitle className="text-sm font-normal text-foreground tracking-wide">
+              Statistik nach IP 7 Tage
+            </CardTitle>
+          </div>
+          <div className="flex items-center gap-1">
+            <button className="p-1 rounded hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors">
+              <Info className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+        {/* Subtitle / description bar like Grafana */}
+        <p className="text-xs text-muted-foreground mt-0.5">Statistik nach IP 7 Tage</p>
       </CardHeader>
-      <CardContent className="p-0">
+
+      <CardContent className="p-0" ref={filterRef}>
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
-              <TableRow className="border-border/30 hover:bg-transparent">
-                {columns.map((col) => (
-                  <TableHead key={col.key} className={`text-xs ${col.align || ""}`}>
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => handleSort(col.key)}
-                        className="flex items-center gap-1 hover:text-foreground transition-colors"
-                      >
-                        {col.label}
-                        <SortIcon col={col.key} />
-                      </button>
-                      <button
-                        onClick={() => setOpenFilter(openFilter === col.key ? null : col.key)}
-                        className={`p-0.5 rounded hover:bg-muted transition-colors ${
-                          filters[col.key] ? "text-primary" : "text-muted-foreground opacity-50 hover:opacity-100"
-                        }`}
-                      >
-                        <Filter className="h-3 w-3" />
-                      </button>
-                    </div>
-                    {openFilter === col.key && (
-                      <div className="mt-1">
-                        <Input
-                          autoFocus
-                          placeholder="Filter..."
-                          value={filters[col.key] || ""}
-                          onChange={(e) =>
-                            setFilters((f) => ({ ...f, [col.key]: e.target.value }))
-                          }
-                          onKeyDown={(e) => e.key === "Escape" && setOpenFilter(null)}
-                          className="h-6 text-xs bg-background border-border/50 font-sans"
-                        />
+              <TableRow className="border-border/20 hover:bg-transparent bg-transparent">
+                {columns.map((col) => {
+                  const isActive = sortKey === col.key;
+                  const hasFilter = !!filters[col.key];
+
+                  return (
+                    <TableHead key={col.key} className="text-xs font-normal text-muted-foreground px-3 py-2 relative">
+                      <div className="flex items-center gap-1.5">
+                        {/* Column label + sort */}
+                        <button
+                          onClick={() => handleSort(col.key)}
+                          className="flex items-center gap-1 hover:text-foreground transition-colors group"
+                        >
+                          <span>{col.label}</span>
+                          {isActive && sortDir === "desc" && (
+                            <ChevronDown className="h-3 w-3 text-primary" />
+                          )}
+                          {isActive && sortDir === "asc" && (
+                            <ChevronUp className="h-3 w-3 text-primary" />
+                          )}
+                        </button>
+
+                        {/* Filter icon (Grafana-style funnel) */}
+                        <button
+                          onClick={() => setOpenFilter(openFilter === col.key ? null : col.key)}
+                          className={`p-0.5 rounded transition-colors ${
+                            hasFilter
+                              ? "text-primary"
+                              : "text-muted-foreground/40 hover:text-muted-foreground"
+                          }`}
+                        >
+                          <Filter className="h-2.5 w-2.5" />
+                        </button>
                       </div>
-                    )}
-                  </TableHead>
-                ))}
+
+                      {/* Filter dropdown */}
+                      {openFilter === col.key && (
+                        <div className="absolute top-full left-0 z-20 mt-1 bg-popover border border-border/50 rounded shadow-lg p-2 min-w-[180px]">
+                          <input
+                            autoFocus
+                            type="text"
+                            placeholder="Filter value..."
+                            value={filters[col.key] || ""}
+                            onChange={(e) =>
+                              setFilters((f) => ({ ...f, [col.key]: e.target.value }))
+                            }
+                            onKeyDown={(e) => {
+                              if (e.key === "Escape") setOpenFilter(null);
+                              if (e.key === "Enter") setOpenFilter(null);
+                            }}
+                            className="w-full bg-background text-foreground text-xs px-2 py-1.5 border border-border/50 rounded outline-none focus:border-primary/50 font-mono"
+                          />
+                          {filters[col.key] && (
+                            <button
+                              onClick={() => {
+                                setFilters((f) => {
+                                  const next = { ...f };
+                                  delete next[col.key];
+                                  return next;
+                                });
+                                setOpenFilter(null);
+                              }}
+                              className="text-[10px] text-muted-foreground hover:text-foreground mt-1 block"
+                            >
+                              Filter zurücksetzen
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </TableHead>
+                  );
+                })}
               </TableRow>
             </TableHeader>
             <TableBody>
               {sorted.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center text-muted-foreground text-xs py-8">
-                    Keine Ergebnisse für diesen Filter
+                    Keine Ergebnisse
                   </TableCell>
                 </TableRow>
               ) : (
-                sorted.map((ip) => (
-                  <TableRow key={ip.ip} className="border-border/20 font-mono text-xs">
-                    <TableCell className="text-foreground font-medium">{ip.ip}</TableCell>
-                    <TableCell className="text-right">{ip.total_events}</TableCell>
-                    <TableCell className="text-muted-foreground">{formatTime(ip.first_seen)}</TableCell>
-                    <TableCell className="text-muted-foreground">{formatTime(ip.last_seen)}</TableCell>
-                    <TableCell className="text-muted-foreground">{ip.last_target_email || "–"}</TableCell>
-                    <TableCell className="text-muted-foreground">{ip.last_event_type}</TableCell>
+                sorted.map((ip, i) => (
+                  <TableRow
+                    key={ip.ip}
+                    className={`border-border/10 font-mono text-xs hover:bg-muted/30 transition-colors ${
+                      i % 2 === 0 ? "bg-transparent" : "bg-muted/10"
+                    }`}
+                  >
+                    <TableCell className="text-foreground px-3 py-2">{ip.ip}</TableCell>
+                    <TableCell className="text-foreground px-3 py-2">{ip.total_events}</TableCell>
+                    <TableCell className="text-muted-foreground px-3 py-2">{formatTime(ip.first_seen)}</TableCell>
+                    <TableCell className="text-muted-foreground px-3 py-2">{formatTime(ip.last_seen)}</TableCell>
+                    <TableCell className="text-muted-foreground px-3 py-2">{ip.last_target_email || "-"}</TableCell>
+                    <TableCell className="text-muted-foreground px-3 py-2">{ip.last_event_type}</TableCell>
                   </TableRow>
                 ))
               )}
