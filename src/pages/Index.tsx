@@ -6,6 +6,8 @@ import CrowdSecAlerts from "@/components/dashboard/CrowdSecAlerts";
 import EventFeed from "@/components/dashboard/EventFeed";
 import SourceBreakdown from "@/components/dashboard/SourceBreakdown";
 import IPStats7Days from "@/components/dashboard/IPStats7Days";
+import AggressiveIPs30Days from "@/components/dashboard/AggressiveIPs30Days";
+import InternalAuthProblems from "@/components/dashboard/InternalAuthProblems";
 
 const Index = () => (
   <div className="min-h-screen bg-background text-foreground">
@@ -45,6 +47,10 @@ const Index = () => (
       </div>
 
       <IPStats7Days />
+
+      <AggressiveIPs30Days />
+
+      <InternalAuthProblems />
 
       <EventFeed />
     </main>
