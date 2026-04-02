@@ -23,7 +23,7 @@ const grundClass = (grund: string): string => {
 };
 
 type SortDir = "asc" | "desc" | null;
-type SortKey = "ip" | "treffer" | "level" | "quelle" | "grund" | "konto" | "last_seen" | "letzte_meldung" | "organisation" | "land" | "ptr";
+type SortKey = "ip" | "treffer" | "level" | "quelle" | "grund" | "konto" | "last_seen" | "letzte_meldung" | "organisation" | "land" | "ptr" | "ziel_port";
 
 const AggressiveIPs30Days = () => {
   const [filters, setFilters] = useState<Record<string, string>>({});
