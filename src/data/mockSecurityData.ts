@@ -161,6 +161,9 @@ export interface AggressiveIP30Days {
   konto: string | null;
   last_seen: string;
   letzte_meldung: string;
+  organisation: string;
+  land: string;
+  ptr: string;
 }
 
 const days = (d: number) => {
