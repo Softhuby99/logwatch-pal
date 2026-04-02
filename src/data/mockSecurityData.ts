@@ -193,12 +193,15 @@ export interface InternalAuthProblem {
   username: string;
   login_type: string;
   last_seen: string;
+  organisation: string;
+  land: string;
+  ptr: string;
 }
 
 export const mockInternalAuthProblems: InternalAuthProblem[] = [
-  { ip: "172.22.1.13", failed_logins: 14962, username: "watchdog@invalid", login_type: "smtp", last_seen: days(0) },
-  { ip: "192.168.3.108", failed_logins: 1056, username: "info@servuswir.de", login_type: "smtp", last_seen: days(2) },
-  { ip: "192.168.1.50", failed_logins: 312, username: "admin@example.com", login_type: "imap", last_seen: days(1) },
-  { ip: "10.0.0.25", failed_logins: 89, username: "backup@example.com", login_type: "smtp", last_seen: days(5) },
-  { ip: "172.22.1.100", failed_logins: 45, username: "scanner@internal", login_type: "smtp", last_seen: days(8) },
+  { ip: "172.22.1.13", failed_logins: 14962, username: "watchdog@invalid", login_type: "smtp", last_seen: days(0), organisation: "intern", land: "DE", ptr: "mailcow.local" },
+  { ip: "192.168.3.108", failed_logins: 1056, username: "info@servuswir.de", login_type: "smtp", last_seen: days(2), organisation: "intern", land: "DE", ptr: "nas.local" },
+  { ip: "192.168.1.50", failed_logins: 312, username: "admin@example.com", login_type: "imap", last_seen: days(1), organisation: "intern", land: "DE", ptr: "desktop-pc.local" },
+  { ip: "10.0.0.25", failed_logins: 89, username: "backup@example.com", login_type: "smtp", last_seen: days(5), organisation: "intern", land: "DE", ptr: "backup-srv.local" },
+  { ip: "172.22.1.100", failed_logins: 45, username: "scanner@internal", login_type: "smtp", last_seen: days(8), organisation: "intern", land: "DE", ptr: "scanner.local" },
 ];
