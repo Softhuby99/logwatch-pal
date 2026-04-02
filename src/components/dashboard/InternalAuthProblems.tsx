@@ -135,6 +135,9 @@ const InternalAuthProblems = () => {
                   <TableCell className="text-muted-foreground px-3 py-2">{row.username}</TableCell>
                   <TableCell className="text-muted-foreground px-3 py-2">{row.login_type}</TableCell>
                   <TableCell className="text-muted-foreground px-3 py-2">{formatTime(row.last_seen)}</TableCell>
+                  <TableCell className="text-muted-foreground px-3 py-2">{row.organisation}</TableCell>
+                  <TableCell className="text-muted-foreground px-3 py-2">{row.land}</TableCell>
+                  <TableCell className="text-muted-foreground px-3 py-2">{row.ptr}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
