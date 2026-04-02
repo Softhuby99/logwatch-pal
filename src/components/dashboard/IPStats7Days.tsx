@@ -1,9 +1,26 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { mockIPSummary } from "@/data/mockSecurityData";
 import { format } from "date-fns";
 import { ChevronDown, ChevronUp, Filter, Info } from "lucide-react";
+
+const eventTypeColor = (type: string): string => {
+  const t = type.toLowerCase();
+  if (t.includes("brute") || t.includes("ban")) return "destructive";
+  if (t.includes("auth") || t.includes("login_failed") || t.includes("password")) return "default";
+  if (t.includes("scan") || t.includes("probe") || t.includes("crawl")) return "secondary";
+  return "outline";
+};
+
+const eventTypeClass = (type: string): string => {
+  const t = type.toLowerCase();
+  if (t.includes("brute") || t.includes("ban")) return "bg-red-500/20 text-red-400 border-red-500/30";
+  if (t.includes("auth") || t.includes("login_failed") || t.includes("password")) return "bg-amber-500/20 text-amber-400 border-amber-500/30";
+  if (t.includes("scan") || t.includes("probe") || t.includes("crawl")) return "bg-blue-500/20 text-blue-400 border-blue-500/30";
+  return "bg-muted text-muted-foreground border-border/30";
+};
 
 type SortDir = "asc" | "desc" | null;
 type SortKey = "ip" | "total_events" | "first_seen" | "last_seen" | "last_target_email" | "last_event_type";
