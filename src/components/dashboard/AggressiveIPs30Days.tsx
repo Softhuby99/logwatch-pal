@@ -165,6 +165,9 @@ const AggressiveIPs30Days = () => {
                   <TableCell className="text-muted-foreground px-3 py-2">{row.konto || "-"}</TableCell>
                   <TableCell className="text-muted-foreground px-3 py-2">{formatTime(row.last_seen)}</TableCell>
                   <TableCell className="text-muted-foreground px-3 py-2 max-w-[400px] truncate">{row.letzte_meldung}</TableCell>
+                  <TableCell className="text-muted-foreground px-3 py-2">{row.organisation}</TableCell>
+                  <TableCell className="text-muted-foreground px-3 py-2">{row.land}</TableCell>
+                  <TableCell className="text-muted-foreground px-3 py-2">{row.ptr}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
