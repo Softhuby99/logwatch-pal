@@ -37,7 +37,7 @@ const InternalAuthProblems = () => {
       const vals: Record<string, string> = {
         ip: row.ip, failed_logins: String(row.failed_logins), username: row.username,
         login_type: row.login_type, last_seen: formatTime(row.last_seen),
-        organisation: row.organisation, land: row.land, ptr: row.ptr,
+        organisation: row.organisation, land: row.land, ptr: row.ptr, ziel_port: row.ziel_port,
       };
       return Object.entries(filters).every(([key, search]) => !search || vals[key]?.toLowerCase().includes(search.toLowerCase()));
     });
