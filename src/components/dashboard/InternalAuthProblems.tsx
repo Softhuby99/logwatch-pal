@@ -129,7 +129,7 @@ const InternalAuthProblems = () => {
             </TableHeader>
             <TableBody>
               {sorted.length === 0 ? (
-                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground text-xs py-8">Keine Ergebnisse</TableCell></TableRow>
+                <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground text-xs py-8">Keine Ergebnisse</TableCell></TableRow>
               ) : sorted.map((row, i) => (
                 <TableRow key={`${row.ip}-${row.username}`} className={`border-border/10 font-mono text-xs hover:bg-muted/30 transition-colors ${i % 2 === 0 ? "bg-transparent" : "bg-muted/10"}`}>
                   <TableCell className="text-foreground px-3 py-2">{row.ip}</TableCell>
