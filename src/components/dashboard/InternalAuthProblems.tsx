@@ -6,7 +6,7 @@ import { format } from "date-fns";
 import { ChevronDown, ChevronUp, Filter, Info } from "lucide-react";
 
 type SortDir = "asc" | "desc" | null;
-type SortKey = "ip" | "failed_logins" | "username" | "login_type" | "last_seen" | "organisation" | "land" | "ptr";
+type SortKey = "ip" | "failed_logins" | "username" | "login_type" | "last_seen" | "organisation" | "land" | "ptr" | "ziel_port";
 
 const InternalAuthProblems = () => {
   const [filters, setFilters] = useState<Record<string, string>>({});
@@ -37,7 +37,7 @@ const InternalAuthProblems = () => {
       const vals: Record<string, string> = {
         ip: row.ip, failed_logins: String(row.failed_logins), username: row.username,
         login_type: row.login_type, last_seen: formatTime(row.last_seen),
-        organisation: row.organisation, land: row.land, ptr: row.ptr,
+        organisation: row.organisation, land: row.land, ptr: row.ptr, ziel_port: row.ziel_port,
       };
       return Object.entries(filters).every(([key, search]) => !search || vals[key]?.toLowerCase().includes(search.toLowerCase()));
     });
@@ -56,6 +56,7 @@ const InternalAuthProblems = () => {
         case "organisation": aVal = a.organisation; bVal = b.organisation; break;
         case "land": aVal = a.land; bVal = b.land; break;
         case "ptr": aVal = a.ptr; bVal = b.ptr; break;
+        case "ziel_port": aVal = a.ziel_port; bVal = b.ziel_port; break;
       }
       if (aVal < bVal) return sortDir === "asc" ? -1 : 1;
       if (aVal > bVal) return sortDir === "asc" ? 1 : -1;
@@ -72,6 +73,7 @@ const InternalAuthProblems = () => {
     { key: "organisation", label: "organisation / ASN" },
     { key: "land", label: "land" },
     { key: "ptr", label: "PTR" },
+    { key: "ziel_port", label: "ziel_port" },
   ];
 
   return (
@@ -127,7 +129,7 @@ const InternalAuthProblems = () => {
             </TableHeader>
             <TableBody>
               {sorted.length === 0 ? (
-                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground text-xs py-8">Keine Ergebnisse</TableCell></TableRow>
+                <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground text-xs py-8">Keine Ergebnisse</TableCell></TableRow>
               ) : sorted.map((row, i) => (
                 <TableRow key={`${row.ip}-${row.username}`} className={`border-border/10 font-mono text-xs hover:bg-muted/30 transition-colors ${i % 2 === 0 ? "bg-transparent" : "bg-muted/10"}`}>
                   <TableCell className="text-foreground px-3 py-2">{row.ip}</TableCell>
@@ -138,6 +140,7 @@ const InternalAuthProblems = () => {
                   <TableCell className="text-muted-foreground px-3 py-2">{row.organisation}</TableCell>
                   <TableCell className="text-muted-foreground px-3 py-2">{row.land}</TableCell>
                   <TableCell className="text-muted-foreground px-3 py-2">{row.ptr}</TableCell>
+                  <TableCell className="text-muted-foreground px-3 py-2">{row.ziel_port}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

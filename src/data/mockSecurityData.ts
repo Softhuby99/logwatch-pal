@@ -164,6 +164,7 @@ export interface AggressiveIP30Days {
   organisation: string;
   land: string;
   ptr: string;
+  ziel_port: string;
 }
 
 const days = (d: number) => {
@@ -174,16 +175,16 @@ const days = (d: number) => {
 };
 
 export const mockAggressiveIPs30Days: AggressiveIP30Days[] = [
-  { ip: "18.218.118.203", treffer: 117, level: "WARN", quelle: "postfix", grund: "Warning", konto: null, last_seen: days(0), letzte_meldung: "CRIT: Banning 18.218.118.203/32 for 960 minutes", organisation: "Amazon AWS", land: "US", ptr: "-" },
-  { ip: "134.209.244.59", treffer: 10, level: "WARN", quelle: "postfix", grund: "improper_command_pipelining", konto: null, last_seen: days(1), letzte_meldung: "postfix/submission/smtpd[50857]: improper command pipelining after CONNECT", organisation: "DigitalOcean", land: "NL", ptr: "-" },
-  { ip: "3.131.220.121", treffer: 12, level: "WARN", quelle: "postfix", grund: "non_smtp_command", konto: null, last_seen: days(1), letzte_meldung: "INFO: Unbanning 3.131.220.121/32", organisation: "Amazon AWS", land: "US", ptr: "-" },
-  { ip: "18.116.101.220", treffer: 62, level: "WARN", quelle: "postfix", grund: "unbanning", konto: null, last_seen: days(2), letzte_meldung: "INFO: Unbanning 18.116.101.220/32", organisation: "Amazon AWS", land: "US", ptr: "-" },
-  { ip: "34.193.119.44", treffer: 15, level: "WARN", quelle: "postfix", grund: "unbanning", konto: null, last_seen: days(2), letzte_meldung: "WARN: 34.193.119.44 matched rule id 4", organisation: "Amazon AWS", land: "US", ptr: "-" },
-  { ip: "45.141.84.91", treffer: 89, level: "CRIT", quelle: "netfilter", grund: "banning", konto: "info@example.com", last_seen: days(3), letzte_meldung: "netfilter: banning 45.141.84.91 for brute-force SMTP", organisation: "unbekannt", land: "RU", ptr: "-" },
-  { ip: "193.56.29.44", treffer: 45, level: "CRIT", quelle: "netfilter", grund: "banning", konto: null, last_seen: days(5), letzte_meldung: "netfilter: banning 193.56.29.44 - repeated auth failures", organisation: "unbekannt", land: "UA", ptr: "-" },
-  { ip: "89.248.163.200", treffer: 33, level: "CRIT", quelle: "crowdsec", grund: "ssh_bruteforce", konto: null, last_seen: days(7), letzte_meldung: "crowdsec: ban 89.248.163.200 SSH bruteforce", organisation: "Censys Inc.", land: "US", ptr: "scanner.censys.io" },
-  { ip: "162.142.125.40", treffer: 21, level: "WARN", quelle: "crowdsec", grund: "http_probing", konto: null, last_seen: days(10), letzte_meldung: "crowdsec: ban 162.142.125.40 HTTP sensitive files", organisation: "Censys Inc.", land: "US", ptr: "scanner.censys.io" },
-  { ip: "5.188.206.14", treffer: 18, level: "WARN", quelle: "postfix", grund: "lost_connection_after_auth", konto: null, last_seen: days(14), letzte_meldung: "postfix: lost connection after AUTH from 5.188.206.14", organisation: "EstNOC OY", land: "EE", ptr: "-" },
+  { ip: "18.218.118.203", treffer: 117, level: "WARN", quelle: "postfix", grund: "Warning", konto: null, last_seen: days(0), letzte_meldung: "CRIT: Banning 18.218.118.203/32 for 960 minutes", organisation: "Amazon AWS", land: "US", ptr: "-", ziel_port: "25/587" },
+  { ip: "134.209.244.59", treffer: 10, level: "WARN", quelle: "postfix", grund: "improper_command_pipelining", konto: null, last_seen: days(1), letzte_meldung: "postfix/submission/smtpd[50857]: improper command pipelining after CONNECT", organisation: "DigitalOcean", land: "NL", ptr: "-", ziel_port: "587" },
+  { ip: "3.131.220.121", treffer: 12, level: "WARN", quelle: "postfix", grund: "non_smtp_command", konto: null, last_seen: days(1), letzte_meldung: "INFO: Unbanning 3.131.220.121/32", organisation: "Amazon AWS", land: "US", ptr: "-", ziel_port: "25" },
+  { ip: "18.116.101.220", treffer: 62, level: "WARN", quelle: "postfix", grund: "unbanning", konto: null, last_seen: days(2), letzte_meldung: "INFO: Unbanning 18.116.101.220/32", organisation: "Amazon AWS", land: "US", ptr: "-", ziel_port: "25/587" },
+  { ip: "34.193.119.44", treffer: 15, level: "WARN", quelle: "postfix", grund: "unbanning", konto: null, last_seen: days(2), letzte_meldung: "WARN: 34.193.119.44 matched rule id 4", organisation: "Amazon AWS", land: "US", ptr: "-", ziel_port: "587" },
+  { ip: "45.141.84.91", treffer: 89, level: "CRIT", quelle: "netfilter", grund: "banning", konto: "info@example.com", last_seen: days(3), letzte_meldung: "netfilter: banning 45.141.84.91 for brute-force SMTP", organisation: "unbekannt", land: "RU", ptr: "-", ziel_port: "25/587" },
+  { ip: "193.56.29.44", treffer: 45, level: "CRIT", quelle: "netfilter", grund: "banning", konto: null, last_seen: days(5), letzte_meldung: "netfilter: banning 193.56.29.44 - repeated auth failures", organisation: "unbekannt", land: "UA", ptr: "-", ziel_port: "993" },
+  { ip: "89.248.163.200", treffer: 33, level: "CRIT", quelle: "crowdsec", grund: "ssh_bruteforce", konto: null, last_seen: days(7), letzte_meldung: "crowdsec: ban 89.248.163.200 SSH bruteforce", organisation: "Censys Inc.", land: "US", ptr: "scanner.censys.io", ziel_port: "22" },
+  { ip: "162.142.125.40", treffer: 21, level: "WARN", quelle: "crowdsec", grund: "http_probing", konto: null, last_seen: days(10), letzte_meldung: "crowdsec: ban 162.142.125.40 HTTP sensitive files", organisation: "Censys Inc.", land: "US", ptr: "scanner.censys.io", ziel_port: "443" },
+  { ip: "5.188.206.14", treffer: 18, level: "WARN", quelle: "postfix", grund: "lost_connection_after_auth", konto: null, last_seen: days(14), letzte_meldung: "postfix: lost connection after AUTH from 5.188.206.14", organisation: "EstNOC OY", land: "EE", ptr: "-", ziel_port: "587" },
 ];
 
 // Internal auth/password problems (30 days)
@@ -196,12 +197,13 @@ export interface InternalAuthProblem {
   organisation: string;
   land: string;
   ptr: string;
+  ziel_port: string;
 }
 
 export const mockInternalAuthProblems: InternalAuthProblem[] = [
-  { ip: "172.22.1.13", failed_logins: 14962, username: "watchdog@invalid", login_type: "smtp", last_seen: days(0), organisation: "intern", land: "DE", ptr: "mailcow.local" },
-  { ip: "192.168.3.108", failed_logins: 1056, username: "info@servuswir.de", login_type: "smtp", last_seen: days(2), organisation: "intern", land: "DE", ptr: "nas.local" },
-  { ip: "192.168.1.50", failed_logins: 312, username: "admin@example.com", login_type: "imap", last_seen: days(1), organisation: "intern", land: "DE", ptr: "desktop-pc.local" },
-  { ip: "10.0.0.25", failed_logins: 89, username: "backup@example.com", login_type: "smtp", last_seen: days(5), organisation: "intern", land: "DE", ptr: "backup-srv.local" },
-  { ip: "172.22.1.100", failed_logins: 45, username: "scanner@internal", login_type: "smtp", last_seen: days(8), organisation: "intern", land: "DE", ptr: "scanner.local" },
+  { ip: "172.22.1.13", failed_logins: 14962, username: "watchdog@invalid", login_type: "smtp", last_seen: days(0), organisation: "intern", land: "DE", ptr: "mailcow.local", ziel_port: "25" },
+  { ip: "192.168.3.108", failed_logins: 1056, username: "info@servuswir.de", login_type: "smtp", last_seen: days(2), organisation: "intern", land: "DE", ptr: "nas.local", ziel_port: "587" },
+  { ip: "192.168.1.50", failed_logins: 312, username: "admin@example.com", login_type: "imap", last_seen: days(1), organisation: "intern", land: "DE", ptr: "desktop-pc.local", ziel_port: "993" },
+  { ip: "10.0.0.25", failed_logins: 89, username: "backup@example.com", login_type: "smtp", last_seen: days(5), organisation: "intern", land: "DE", ptr: "backup-srv.local", ziel_port: "25/587" },
+  { ip: "172.22.1.100", failed_logins: 45, username: "scanner@internal", login_type: "smtp", last_seen: days(8), organisation: "intern", land: "DE", ptr: "scanner.local", ziel_port: "587" },
 ];
