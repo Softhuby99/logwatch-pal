@@ -6,7 +6,7 @@ import { format } from "date-fns";
 import { ChevronDown, ChevronUp, Filter, Info } from "lucide-react";
 
 type SortDir = "asc" | "desc" | null;
-type SortKey = "ip" | "failed_logins" | "username" | "login_type" | "last_seen";
+type SortKey = "ip" | "failed_logins" | "username" | "login_type" | "last_seen" | "organisation" | "land" | "ptr";
 
 const InternalAuthProblems = () => {
   const [filters, setFilters] = useState<Record<string, string>>({});
@@ -37,6 +37,7 @@ const InternalAuthProblems = () => {
       const vals: Record<string, string> = {
         ip: row.ip, failed_logins: String(row.failed_logins), username: row.username,
         login_type: row.login_type, last_seen: formatTime(row.last_seen),
+        organisation: row.organisation, land: row.land, ptr: row.ptr,
       };
       return Object.entries(filters).every(([key, search]) => !search || vals[key]?.toLowerCase().includes(search.toLowerCase()));
     });
@@ -52,6 +53,9 @@ const InternalAuthProblems = () => {
         case "username": aVal = a.username; bVal = b.username; break;
         case "login_type": aVal = a.login_type; bVal = b.login_type; break;
         case "last_seen": aVal = new Date(a.last_seen).getTime(); bVal = new Date(b.last_seen).getTime(); break;
+        case "organisation": aVal = a.organisation; bVal = b.organisation; break;
+        case "land": aVal = a.land; bVal = b.land; break;
+        case "ptr": aVal = a.ptr; bVal = b.ptr; break;
       }
       if (aVal < bVal) return sortDir === "asc" ? -1 : 1;
       if (aVal > bVal) return sortDir === "asc" ? 1 : -1;
@@ -65,6 +69,9 @@ const InternalAuthProblems = () => {
     { key: "username", label: "username" },
     { key: "login_type", label: "login_type" },
     { key: "last_seen", label: "last_seen" },
+    { key: "organisation", label: "organisation / ASN" },
+    { key: "land", label: "land" },
+    { key: "ptr", label: "PTR" },
   ];
 
   return (
@@ -120,7 +127,7 @@ const InternalAuthProblems = () => {
             </TableHeader>
             <TableBody>
               {sorted.length === 0 ? (
-                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground text-xs py-8">Keine Ergebnisse</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground text-xs py-8">Keine Ergebnisse</TableCell></TableRow>
               ) : sorted.map((row, i) => (
                 <TableRow key={`${row.ip}-${row.username}`} className={`border-border/10 font-mono text-xs hover:bg-muted/30 transition-colors ${i % 2 === 0 ? "bg-transparent" : "bg-muted/10"}`}>
                   <TableCell className="text-foreground px-3 py-2">{row.ip}</TableCell>
@@ -128,6 +135,9 @@ const InternalAuthProblems = () => {
                   <TableCell className="text-muted-foreground px-3 py-2">{row.username}</TableCell>
                   <TableCell className="text-muted-foreground px-3 py-2">{row.login_type}</TableCell>
                   <TableCell className="text-muted-foreground px-3 py-2">{formatTime(row.last_seen)}</TableCell>
+                  <TableCell className="text-muted-foreground px-3 py-2">{row.organisation}</TableCell>
+                  <TableCell className="text-muted-foreground px-3 py-2">{row.land}</TableCell>
+                  <TableCell className="text-muted-foreground px-3 py-2">{row.ptr}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

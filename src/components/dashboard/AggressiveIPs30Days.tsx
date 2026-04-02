@@ -23,7 +23,7 @@ const grundClass = (grund: string): string => {
 };
 
 type SortDir = "asc" | "desc" | null;
-type SortKey = "ip" | "treffer" | "level" | "quelle" | "grund" | "konto" | "last_seen" | "letzte_meldung";
+type SortKey = "ip" | "treffer" | "level" | "quelle" | "grund" | "konto" | "last_seen" | "letzte_meldung" | "organisation" | "land" | "ptr";
 
 const AggressiveIPs30Days = () => {
   const [filters, setFilters] = useState<Record<string, string>>({});
@@ -54,7 +54,7 @@ const AggressiveIPs30Days = () => {
       const vals: Record<string, string> = {
         ip: row.ip, treffer: String(row.treffer), level: row.level, quelle: row.quelle,
         grund: row.grund, konto: row.konto || "-", last_seen: formatTime(row.last_seen),
-        letzte_meldung: row.letzte_meldung,
+        letzte_meldung: row.letzte_meldung, organisation: row.organisation, land: row.land, ptr: row.ptr,
       };
       return Object.entries(filters).every(([key, search]) => !search || vals[key]?.toLowerCase().includes(search.toLowerCase()));
     });
@@ -73,6 +73,9 @@ const AggressiveIPs30Days = () => {
         case "konto": aVal = a.konto || ""; bVal = b.konto || ""; break;
         case "last_seen": aVal = new Date(a.last_seen).getTime(); bVal = new Date(b.last_seen).getTime(); break;
         case "letzte_meldung": aVal = a.letzte_meldung; bVal = b.letzte_meldung; break;
+        case "organisation": aVal = a.organisation; bVal = b.organisation; break;
+        case "land": aVal = a.land; bVal = b.land; break;
+        case "ptr": aVal = a.ptr; bVal = b.ptr; break;
       }
       if (aVal < bVal) return sortDir === "asc" ? -1 : 1;
       if (aVal > bVal) return sortDir === "asc" ? 1 : -1;
@@ -89,6 +92,9 @@ const AggressiveIPs30Days = () => {
     { key: "konto", label: "konto" },
     { key: "last_seen", label: "last_seen" },
     { key: "letzte_meldung", label: "letzte_meldung" },
+    { key: "organisation", label: "organisation / ASN" },
+    { key: "land", label: "land" },
+    { key: "ptr", label: "PTR" },
   ];
 
   return (
@@ -144,7 +150,7 @@ const AggressiveIPs30Days = () => {
             </TableHeader>
             <TableBody>
               {sorted.length === 0 ? (
-                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground text-xs py-8">Keine Ergebnisse</TableCell></TableRow>
+                <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground text-xs py-8">Keine Ergebnisse</TableCell></TableRow>
               ) : sorted.map((row, i) => (
                 <TableRow key={row.ip} className={`border-border/10 font-mono text-xs hover:bg-muted/30 transition-colors ${i % 2 === 0 ? "bg-transparent" : "bg-muted/10"}`}>
                   <TableCell className="text-foreground px-3 py-2">{row.ip}</TableCell>
@@ -159,6 +165,9 @@ const AggressiveIPs30Days = () => {
                   <TableCell className="text-muted-foreground px-3 py-2">{row.konto || "-"}</TableCell>
                   <TableCell className="text-muted-foreground px-3 py-2">{formatTime(row.last_seen)}</TableCell>
                   <TableCell className="text-muted-foreground px-3 py-2 max-w-[400px] truncate">{row.letzte_meldung}</TableCell>
+                  <TableCell className="text-muted-foreground px-3 py-2">{row.organisation}</TableCell>
+                  <TableCell className="text-muted-foreground px-3 py-2">{row.land}</TableCell>
+                  <TableCell className="text-muted-foreground px-3 py-2">{row.ptr}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
