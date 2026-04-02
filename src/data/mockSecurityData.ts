@@ -164,6 +164,7 @@ export interface AggressiveIP30Days {
   organisation: string;
   land: string;
   ptr: string;
+  ziel_port: string;
 }
 
 const days = (d: number) => {
