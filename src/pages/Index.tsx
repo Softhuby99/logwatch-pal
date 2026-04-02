@@ -44,6 +44,8 @@ const Index = () => (
         <CrowdSecAlerts />
       </div>
 
+      <IPStats7Days />
+
       <EventFeed />
     </main>
   </div>
