@@ -51,14 +51,12 @@ const EventFeed = () => {
               {e.source_component}
             </span>
             <span className="text-xs font-mono text-foreground/90 w-28">{e.ip}</span>
+            <span className="text-[10px] font-mono text-blue-400 w-20">
+              {e.destination_port ? `:${e.destination_port}` : "-"}{e.destination_service ? ` ${e.destination_service}` : ""}
+            </span>
             <span className="text-[10px] text-muted-foreground truncate flex-1">
               {e.event_type.replace(/_/g, " ")}
             </span>
-            {e.destination_port && (
-              <span className="text-[10px] font-mono text-muted-foreground/50">
-                :{e.destination_port}
-              </span>
-            )}
           </div>
         ))}
       </CardContent>
