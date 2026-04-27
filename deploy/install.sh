@@ -124,6 +124,15 @@ ensure_host_cron() {
 bring_up() {
   chmod +x backup/backup.sh backup/entrypoint.sh
   echo "[install] building & starting stack..."
+  # Activate the "authentik" compose profile only when INSTALL_AUTHENTIK=true.
+  # Otherwise the dashboard talks to the existing Authentik instance under AUTHENTIK_URL.
+  if [ "${INSTALL_AUTHENTIK:-true}" = "true" ]; then
+    export COMPOSE_PROFILES=authentik
+    echo "[install] mode: bundled Authentik (profile=authentik)"
+  else
+    unset COMPOSE_PROFILES
+    echo "[install] mode: external Authentik at ${AUTHENTIK_URL}"
+  fi
   docker compose pull
   docker compose build dashboard
   docker compose up -d
@@ -143,6 +152,9 @@ cat <<EOF
 Stack is up.
   Bound to  : ${SERVER_IP}:80  /  ${SERVER_IP}:443
   Dashboard : http://${HOSTNAME}/   (HTTPS once certs are in ${CERT_PATH})
+EOF
+if [ "${INSTALL_AUTHENTIK:-true}" = "true" ]; then
+  cat <<EOF
   Authentik : http://${HOSTNAME}/auth/   (login: akadmin / ${AUTHENTIK_BOOTSTRAP_PASSWORD})
 
 Next steps:
@@ -151,5 +163,16 @@ Next steps:
      into deploy/.env as OIDC_CLIENT_SECRET=… and run:
          docker compose up -d authentik authentik-worker
   3. Configure Google / Microsoft / SAML sources – see deploy/README-SSO.md
-──────────────────────────────────────────────────────────────
 EOF
+else
+  cat <<EOF
+  Authentik : EXTERNAL → ${AUTHENTIK_URL}
+
+Next steps:
+  1. In your existing Authentik, create an OIDC Provider + Application
+     with redirect URI: https://${HOSTNAME}/auth/callback
+  2. Set OIDC_CLIENT_SECRET in deploy/.env and rebuild:
+         docker compose build dashboard && docker compose up -d dashboard
+EOF
+fi
+echo "──────────────────────────────────────────────────────────────"
