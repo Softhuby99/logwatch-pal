@@ -29,10 +29,12 @@ interface ChartRow {
   iso: string;
   /** Label für X-Achse */
   label: string;
-  Bans: number;
+  "Brute Force": number;
   "Auth Failures": number;
-  CrowdSec: number;
-  Andere: number;
+  "Port Scan": number;
+  Bans: number;
+  Unbans: number;
+  "Crawl/Probe": number;
 }
 
 const PRESETS: Array<{ value: RangePreset; label: string }> = [
@@ -43,6 +45,31 @@ const PRESETS: Array<{ value: RangePreset; label: string }> = [
   { value: "day", label: "Datum" },
 ];
 
+/** Klassifiziere Event in eine der 6 Angriffstypen-Spuren */
+const classify = (
+  ev: IpTimelineEvent
+): keyof Omit<ChartRow, "iso" | "label"> | null => {
+  if (ev.kind === "ban") return "Bans";
+  if (ev.kind === "unban") return "Unbans";
+  if (ev.kind === "auth_failure") {
+    return ev.type_label?.toUpperCase().includes("BRUTE")
+      ? "Brute Force"
+      : "Auth Failures";
+  }
+  if (ev.kind === "crowdsec") {
+    const t = (ev.type_label || "").toUpperCase();
+    if (t.includes("PROBING") || t.includes("SCAN") || t.includes("PORT")) return "Port Scan";
+    return "Crawl/Probe";
+  }
+  if (ev.kind === "security_event") {
+    const t = (ev.type_label || "").toUpperCase();
+    if (t.includes("BRUTE")) return "Brute Force";
+    if (t.includes("AUTH")) return "Auth Failures";
+    return "Crawl/Probe";
+  }
+  return null;
+};
+
 /** Buckets erzeugen: stündlich oder täglich. */
 const buildBuckets = (
   events: IpTimelineEvent[],
@@ -52,7 +79,6 @@ const buildBuckets = (
 ): ChartRow[] => {
   const stepMs = granularity === "hour" ? 3_600_000 : 86_400_000;
 
-  // Bucket-Start auf step abrunden
   const align = (ms: number) =>
     granularity === "hour"
       ? new Date(ms).setMinutes(0, 0, 0)
@@ -71,10 +97,12 @@ const buildBuckets = (
     buckets.set(t, {
       iso: d.toISOString(),
       label,
-      Bans: 0,
+      "Brute Force": 0,
       "Auth Failures": 0,
-      CrowdSec: 0,
-      Andere: 0,
+      "Port Scan": 0,
+      Bans: 0,
+      Unbans: 0,
+      "Crawl/Probe": 0,
     });
   }
 
@@ -84,11 +112,8 @@ const buildBuckets = (
     const key = align(t);
     const bucket = buckets.get(key);
     if (!bucket) return;
-    if (ev.kind === "ban" || ev.kind === "unban") bucket.Bans++;
-    else if (ev.kind === "auth_failure") bucket["Auth Failures"]++;
-    else if (ev.kind === "crowdsec") bucket.CrowdSec++;
-    else if (ev.kind === "security_event") bucket.Andere++;
-    // auth_success absichtlich ignoriert
+    const cat = classify(ev);
+    if (cat) bucket[cat]++;
   });
 
   return Array.from(buckets.values());
