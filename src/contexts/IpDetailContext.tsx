@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import { useLocation } from "react-router-dom";
 import IpDetailSheet from "@/components/dashboard/IpDetailSheet";
 
 interface IpDetailCtx {
@@ -10,11 +11,18 @@ const Ctx = createContext<IpDetailCtx | null>(null);
 export const IpDetailProvider = ({ children }: { children: ReactNode }) => {
   const [ip, setIp] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const location = useLocation();
 
   const openIp = useCallback((newIp: string) => {
     setIp(newIp);
     setOpen(true);
   }, []);
+
+  useEffect(() => {
+    if (location.pathname.startsWith("/ip/")) {
+      setOpen(false);
+    }
+  }, [location.pathname]);
 
   return (
     <Ctx.Provider value={{ openIp }}>
