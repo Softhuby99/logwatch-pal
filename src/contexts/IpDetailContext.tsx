@@ -4,6 +4,7 @@ import IpDetailSheet from "@/components/dashboard/IpDetailSheet";
 
 interface IpDetailCtx {
   openIp: (ip: string) => void;
+  closeIp: () => void;
 }
 
 const Ctx = createContext<IpDetailCtx | null>(null);
@@ -18,6 +19,10 @@ export const IpDetailProvider = ({ children }: { children: ReactNode }) => {
     setOpen(true);
   }, []);
 
+  const closeIp = useCallback(() => {
+    setOpen(false);
+  }, []);
+
   useEffect(() => {
     if (location.pathname.startsWith("/ip/")) {
       setOpen(false);
@@ -25,7 +30,7 @@ export const IpDetailProvider = ({ children }: { children: ReactNode }) => {
   }, [location.pathname]);
 
   return (
-    <Ctx.Provider value={{ openIp }}>
+    <Ctx.Provider value={{ openIp, closeIp }}>
       {children}
       <IpDetailSheet ip={ip} open={open} onOpenChange={setOpen} />
     </Ctx.Provider>
@@ -40,6 +45,7 @@ export const useIpDetail = (): IpDetailCtx => {
       openIp: (ip: string) => {
         window.location.href = `/ip/${encodeURIComponent(ip)}`;
       },
+      closeIp: () => undefined,
     };
   }
   return ctx;

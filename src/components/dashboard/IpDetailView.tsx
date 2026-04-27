@@ -31,6 +31,7 @@ import { getIpTimeline, type IpTimelineEvent, type TimelineEventKind } from "@/l
 import BanTimeline from "./BanTimeline";
 import IpActivityChart from "./IpActivityChart";
 import type { AlertLevel, RiskLevel } from "@/types/database";
+import { useIpDetail } from "@/contexts/IpDetailContext";
 
 interface Props {
   ip: string;
@@ -122,10 +123,15 @@ const TimelineRow = ({ ev }: { ev: IpTimelineEvent }) => {
 
 const FullViewLink = ({ ip }: { ip: string }) => {
   const navigate = useNavigate();
+  const { closeIp } = useIpDetail();
+
   return (
     <button
       type="button"
-      onClick={() => navigate(`/ip/${encodeURIComponent(ip)}`)}
+      onClick={() => {
+        closeIp();
+        navigate(`/ip/${encodeURIComponent(ip)}`);
+      }}
       className="text-xs text-primary hover:underline flex items-center gap-1 whitespace-nowrap"
     >
       <ExternalLink className="h-3 w-3" /> Volle Ansicht
