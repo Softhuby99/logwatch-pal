@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
@@ -120,6 +120,19 @@ const TimelineRow = ({ ev }: { ev: IpTimelineEvent }) => {
   );
 };
 
+const FullViewLink = ({ ip }: { ip: string }) => {
+  const navigate = useNavigate();
+  return (
+    <button
+      type="button"
+      onClick={() => navigate(`/ip/${encodeURIComponent(ip)}`)}
+      className="text-xs text-primary hover:underline flex items-center gap-1 whitespace-nowrap"
+    >
+      <ExternalLink className="h-3 w-3" /> Volle Ansicht
+    </button>
+  );
+};
+
 const IpDetailView = ({ ip, embedded = false }: Props) => {
   const data = useMemo(() => getIpTimeline(ip), [ip]);
   const { summary, enrichment, risk, events, stats, by_type, ban_intervals } = data;
@@ -157,22 +170,7 @@ const IpDetailView = ({ ip, embedded = false }: Props) => {
               {stats.last_seen && <div>last: <span className="text-foreground/80">{fmt(stats.last_seen)}</span></div>}
             </div>
           </div>
-          {embedded && (
-            <button
-              type="button"
-              onClick={() => {
-                const url = `/ip/${encodeURIComponent(ip)}`;
-                const win = window.open(url, "_blank", "noopener");
-                // Bring the new tab/window to the foreground
-                if (win) {
-                  try { win.focus(); } catch { /* noop */ }
-                }
-              }}
-              className="text-xs text-primary hover:underline flex items-center gap-1 whitespace-nowrap"
-            >
-              <ExternalLink className="h-3 w-3" /> Volle Ansicht
-            </button>
-          )}
+          {embedded && <FullViewLink ip={ip} />}
         </div>
       </div>
 
@@ -187,7 +185,7 @@ const IpDetailView = ({ ip, embedded = false }: Props) => {
       </div>
 
       {/* Ban-Historie (eigene Zeitlinie) */}
-      <BanTimeline intervals={ban_intervals} compact={embedded} />
+      <BanTimeline intervals={ban_intervals} compact={embedded} events={events} />
 
       {/* Aktivität (24h / 7T / 30T / 90T / einzelnes Datum) */}
       <IpActivityChart events={events} />

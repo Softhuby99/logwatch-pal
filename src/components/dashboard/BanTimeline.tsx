@@ -1,16 +1,23 @@
 import { useMemo, useState } from "react";
-import { Ban, ShieldOff, Clock, Activity } from "lucide-react";
+import { Ban, ShieldOff, Clock, KeyRound, AlertTriangle, Eye } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { format, formatDistanceStrict } from "date-fns";
-import { de } from "date-fns/locale";
-import type { BanInterval } from "@/lib/ipTimeline";
+import { format } from "date-fns";
+import type { BanInterval, IpTimelineEvent, TimelineEventKind } from "@/lib/ipTimeline";
 
 interface Props {
   intervals: BanInterval[];
   /** Compact = innerhalb Sheet, false = volle Höhe */
   compact?: boolean;
+  /** Optional: Angriffs-Events, die als Marker unter der Ban-Achse gezeigt werden */
+  events?: IpTimelineEvent[];
 }
+
+const ATTACK_KIND_META: Partial<Record<TimelineEventKind, { label: string; color: string; ring: string; icon: typeof KeyRound }>> = {
+  auth_failure: { label: "Auth Failure", color: "bg-amber-500", ring: "ring-amber-400/40", icon: KeyRound },
+  crowdsec: { label: "CrowdSec", color: "bg-blue-500", ring: "ring-blue-400/40", icon: Eye },
+  security_event: { label: "Security Event", color: "bg-orange-500", ring: "ring-orange-400/40", icon: AlertTriangle },
+};
 
 const fmtFull = (iso: string) => {
   try {
@@ -42,8 +49,9 @@ const fmtDuration = (ms: number) => {
   return h ? `${d}d ${h}h` : `${d}d`;
 };
 
-const BanTimeline = ({ intervals, compact = false }: Props) => {
+const BanTimeline = ({ intervals, compact = false, events = [] }: Props) => {
   const [hoverId, setHoverId] = useState<string | null>(null);
+  const [hoverEvId, setHoverEvId] = useState<string | null>(null);
 
   // Skala: vom ältesten Ban bis "jetzt"
   const { minMs, maxMs, totalMs, validIntervals } = useMemo(() => {
@@ -89,6 +97,20 @@ const BanTimeline = ({ intervals, compact = false }: Props) => {
   const totalBannedMs = validIntervals.reduce((s, i) => s + i.duration_ms, 0);
   const activeCount = validIntervals.filter((i) => i.active).length;
 
+  // Angriffs-Events innerhalb des sichtbaren Zeitfensters
+  const attackEvents = useMemo(() => {
+    return events
+      .filter((e) => ATTACK_KIND_META[e.kind])
+      .map((e) => ({ ev: e, t: new Date(e.event_time).getTime() }))
+      .filter((x) => x.t >= minMs && x.t <= maxMs);
+  }, [events, minMs, maxMs]);
+
+  const attackCounts = useMemo(() => {
+    const counts: Partial<Record<TimelineEventKind, number>> = {};
+    for (const { ev } of attackEvents) counts[ev.kind] = (counts[ev.kind] ?? 0) + 1;
+    return counts;
+  }, [attackEvents]);
+
   return (
     <div className="border border-border/40 rounded bg-card/60">
       {/* Header */}
@@ -121,14 +143,23 @@ const BanTimeline = ({ intervals, compact = false }: Props) => {
             <span className="w-2 h-2 rounded-full bg-emerald-500" />
             Unban
           </span>
+          {Object.entries(ATTACK_KIND_META).map(([kind, meta]) =>
+            meta && attackCounts[kind as TimelineEventKind] ? (
+              <span key={kind} className="flex items-center gap-1">
+                <span className={`w-2 h-2 rounded-full ${meta.color}`} />
+                {meta.label}
+                <span className="text-foreground/70">({attackCounts[kind as TimelineEventKind]})</span>
+              </span>
+            ) : null
+          )}
         </div>
       </div>
 
       {/* Horizontal Timeline */}
       <div className="px-3 pt-4 pb-2">
-        <div className="relative h-12">
-          {/* Achse */}
-          <div className="absolute left-0 right-0 top-1/2 h-px bg-border/40" />
+        <div className="relative h-16">
+          {/* Achse (oben für Bans, Mitte für Angriffe) */}
+          <div className="absolute left-0 right-0 top-[28%] h-px bg-border/40" />
 
           {/* "Jetzt"-Marker */}
           {nowPct >= 0 && nowPct <= 100 && (
@@ -154,7 +185,7 @@ const BanTimeline = ({ intervals, compact = false }: Props) => {
             return (
               <div
                 key={iv.id}
-                className="absolute top-1/2 -translate-y-1/2 group cursor-pointer"
+                className="absolute top-[28%] -translate-y-1/2 group cursor-pointer"
                 style={{ left: `${leftPct}%`, width: `${widthPct}%` }}
                 onMouseEnter={() => setHoverId(iv.id)}
                 onMouseLeave={() => setHoverId(null)}
@@ -223,6 +254,48 @@ const BanTimeline = ({ intervals, compact = false }: Props) => {
                         </span>
                       </div>
                     </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {/* Angriffs-Spur (untere Hälfte) */}
+          {attackEvents.length > 0 && (
+            <div className="absolute left-0 right-0 top-[70%] h-px bg-border/30" />
+          )}
+          {attackEvents.map(({ ev, t }) => {
+            const leftPct = ((t - minMs) / totalMs) * 100;
+            const meta = ATTACK_KIND_META[ev.kind]!;
+            const isHover = hoverEvId === ev.id;
+            return (
+              <div
+                key={`atk-${ev.id}`}
+                className="absolute group"
+                style={{ left: `${leftPct}%`, top: "70%", transform: "translate(-50%, -50%)" }}
+                onMouseEnter={() => setHoverEvId(ev.id)}
+                onMouseLeave={() => setHoverEvId(null)}
+              >
+                <div
+                  className={`w-1.5 h-1.5 rounded-full ${meta.color} ring-1 ${meta.ring} cursor-pointer ${
+                    isHover ? "scale-[2.2]" : "hover:scale-150"
+                  } transition-transform`}
+                />
+                {isHover && (
+                  <div
+                    className="absolute z-30 bg-popover border border-border/60 rounded px-2 py-1 shadow-lg text-[10px] font-mono whitespace-nowrap pointer-events-none"
+                    style={{
+                      bottom: "calc(100% + 6px)",
+                      left: "50%",
+                      transform: "translateX(-50%)",
+                    }}
+                  >
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <span className={`w-1.5 h-1.5 rounded-full ${meta.color}`} />
+                      <span className="text-foreground font-semibold">{meta.label}</span>
+                    </div>
+                    <div className="text-muted-foreground">{fmtFull(ev.event_time)}</div>
+                    <div className="text-foreground/80 max-w-[260px] truncate">{ev.type_label}</div>
                   </div>
                 )}
               </div>
