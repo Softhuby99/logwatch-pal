@@ -119,8 +119,8 @@ services:
     image: nginx:1.27-alpine
     restart: unless-stopped
     ports:
-      - "80:80"
-      - "443:443"
+      - "${SERVER_IP:-0.0.0.0}:80:80"
+      - "${SERVER_IP:-0.0.0.0}:443:443"
     environment:
       HOSTNAME: ${HOSTNAME}
     volumes:
