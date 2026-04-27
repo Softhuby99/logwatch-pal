@@ -13,6 +13,7 @@ export const IpDetailProvider = ({ children }: { children: ReactNode }) => {
   const [ip, setIp] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const location = useLocation();
+  const isIpFullViewRoute = location.pathname.startsWith("/ip/");
 
   const openIp = useCallback((newIp: string) => {
     setIp(newIp);
@@ -24,15 +25,15 @@ export const IpDetailProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    if (location.pathname.startsWith("/ip/")) {
+    if (isIpFullViewRoute) {
       setOpen(false);
     }
-  }, [location.pathname]);
+  }, [isIpFullViewRoute]);
 
   return (
     <Ctx.Provider value={{ openIp, closeIp }}>
       {children}
-      <IpDetailSheet ip={ip} open={open} onOpenChange={setOpen} />
+      {!isIpFullViewRoute && <IpDetailSheet ip={ip} open={open} onOpenChange={setOpen} />}
     </Ctx.Provider>
   );
 };
