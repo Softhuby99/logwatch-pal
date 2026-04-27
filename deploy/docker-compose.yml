@@ -154,7 +154,7 @@ services:
     entrypoint: ["/usr/local/bin/entrypoint.sh"]
     depends_on:
       - db
-      - authentik-db
+      # authentik-db only present with profile "authentik" — backup script handles absence.
 
 volumes:
   db-data:
