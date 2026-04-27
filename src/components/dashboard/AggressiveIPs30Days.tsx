@@ -6,6 +6,7 @@ import { mockAggressiveIPs30Days } from "@/data/mockSecurityData";
 import { format } from "date-fns";
 import { ChevronDown, ChevronUp, Filter, Info } from "lucide-react";
 import type { AlertLevel, RiskLevel } from "@/types/database";
+import { useIpDetail } from "@/contexts/IpDetailContext";
 
 const levelClass = (level: AlertLevel | null): string => {
   if (level === "CRIT") return "bg-red-500/20 text-red-400 border-red-500/30";
@@ -39,6 +40,7 @@ type SortKey =
   | "last_destination_port";
 
 const AggressiveIPs30Days = () => {
+  const { openIp } = useIpDetail();
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [openFilter, setOpenFilter] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("risk_score");
@@ -192,8 +194,12 @@ const AggressiveIPs30Days = () => {
               {sorted.length === 0 ? (
                 <TableRow><TableCell colSpan={columns.length} className="text-center text-muted-foreground text-xs py-8">Keine Ergebnisse</TableCell></TableRow>
               ) : sorted.map((row, i) => (
-                <TableRow key={row.ip} className={`border-border/10 font-mono text-xs hover:bg-muted/30 transition-colors ${i % 2 === 0 ? "bg-transparent" : "bg-muted/10"}`}>
-                  <TableCell className="text-foreground px-3 py-2">{row.ip}</TableCell>
+                <TableRow
+                  key={row.ip}
+                  onClick={() => openIp(row.ip)}
+                  className={`border-border/10 font-mono text-xs cursor-pointer hover:bg-muted/30 transition-colors ${i % 2 === 0 ? "bg-transparent" : "bg-muted/10"}`}
+                >
+                  <TableCell className="text-primary hover:underline font-medium px-3 py-2">{row.ip}</TableCell>
                   <TableCell className="text-foreground px-3 py-2 font-semibold">{row.risk_score}</TableCell>
                   <TableCell className="px-3 py-2">
                     <Badge variant="outline" className={`text-[10px] px-1.5 font-mono ${riskLevelClass(row.risk_level)}`}>{row.risk_level}</Badge>
