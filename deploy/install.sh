@@ -131,6 +131,7 @@ bring_up() {
 
 require_root
 ensure_docker
+prompt_server_ip
 ensure_users
 ensure_dirs
 ensure_host_cron
@@ -140,6 +141,7 @@ cat <<EOF
 
 ──────────────────────────────────────────────────────────────
 Stack is up.
+  Bound to  : ${SERVER_IP}:80  /  ${SERVER_IP}:443
   Dashboard : http://${HOSTNAME}/   (HTTPS once certs are in ${CERT_PATH})
   Authentik : http://${HOSTNAME}/auth/   (login: akadmin / ${AUTHENTIK_BOOTSTRAP_PASSWORD})
 
