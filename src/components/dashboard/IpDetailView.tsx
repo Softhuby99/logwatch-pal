@@ -181,49 +181,8 @@ const IpDetailView = ({ ip, embedded = false }: Props) => {
       {/* Ban-Historie (eigene Zeitlinie) */}
       <BanTimeline intervals={ban_intervals} compact={embedded} />
 
-      {/* Daily Stacked Area */}
-      <div className="border border-border/40 rounded bg-card/60 p-3">
-        <div className="flex items-center gap-2 mb-2">
-          <Activity className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="text-xs text-muted-foreground tracking-wide">Aktivität pro Tag (30 Tage)</span>
-        </div>
-        <div className="h-[180px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={dailyChartData} margin={{ top: 5, right: 8, bottom: 0, left: -25 }}>
-              <defs>
-                <linearGradient id="g-bans" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="hsl(0 84% 60%)" stopOpacity={0.5} />
-                  <stop offset="100%" stopColor="hsl(0 84% 60%)" stopOpacity={0.05} />
-                </linearGradient>
-                <linearGradient id="g-auth" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="hsl(38 92% 50%)" stopOpacity={0.5} />
-                  <stop offset="100%" stopColor="hsl(38 92% 50%)" stopOpacity={0.05} />
-                </linearGradient>
-                <linearGradient id="g-crowd" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="hsl(217 91% 60%)" stopOpacity={0.5} />
-                  <stop offset="100%" stopColor="hsl(217 91% 60%)" stopOpacity={0.05} />
-                </linearGradient>
-                <linearGradient id="g-other" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="hsl(25 95% 53%)" stopOpacity={0.5} />
-                  <stop offset="100%" stopColor="hsl(25 95% 53%)" stopOpacity={0.05} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(217 32% 17%)" />
-              <XAxis dataKey="date" tick={{ fontSize: 9, fill: "hsl(215 20% 55%)" }} interval="preserveStartEnd" minTickGap={30} />
-              <YAxis tick={{ fontSize: 9, fill: "hsl(215 20% 55%)" }} allowDecimals={false} />
-              <Tooltip
-                contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 4, fontSize: 11 }}
-                labelStyle={{ color: "hsl(var(--muted-foreground))" }}
-              />
-              <Legend wrapperStyle={{ fontSize: 10 }} />
-              <Area type="monotone" dataKey="Bans" stackId="1" stroke="hsl(0 84% 60%)" fill="url(#g-bans)" strokeWidth={1.5} />
-              <Area type="monotone" dataKey="Auth Failures" stackId="1" stroke="hsl(38 92% 50%)" fill="url(#g-auth)" strokeWidth={1.5} />
-              <Area type="monotone" dataKey="CrowdSec" stackId="1" stroke="hsl(217 91% 60%)" fill="url(#g-crowd)" strokeWidth={1.5} />
-              <Area type="monotone" dataKey="Andere" stackId="1" stroke="hsl(25 95% 53%)" fill="url(#g-other)" strokeWidth={1.5} />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
+      {/* Aktivität (24h / 7T / 30T / 90T / einzelnes Datum) */}
+      <IpActivityChart events={events} />
 
       {/* Top Reasons Bar Chart */}
       {by_type.length > 0 && (
