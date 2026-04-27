@@ -5,15 +5,24 @@ import { Badge } from "@/components/ui/badge";
 import { mockAggressiveIPs30Days } from "@/data/mockSecurityData";
 import { format } from "date-fns";
 import { ChevronDown, ChevronUp, Filter, Info } from "lucide-react";
+import type { AlertLevel, RiskLevel } from "@/types/database";
 
-const levelClass = (level: string): string => {
+const levelClass = (level: AlertLevel | null): string => {
   if (level === "CRIT") return "bg-red-500/20 text-red-400 border-red-500/30";
   if (level === "WARN") return "bg-amber-500/20 text-amber-400 border-amber-500/30";
   return "bg-muted text-muted-foreground border-border/30";
 };
 
-const grundClass = (grund: string): string => {
-  const g = grund.toLowerCase();
+const riskLevelClass = (level: RiskLevel): string => {
+  if (level === "CRIT") return "bg-red-600/30 text-red-300 border-red-600/40";
+  if (level === "HIGH") return "bg-orange-500/20 text-orange-400 border-orange-500/30";
+  if (level === "MEDIUM") return "bg-amber-500/20 text-amber-400 border-amber-500/30";
+  return "bg-emerald-500/15 text-emerald-400 border-emerald-500/30";
+};
+
+const eventTypeClass = (type: string | null): string => {
+  if (!type) return "bg-muted text-muted-foreground border-border/30";
+  const g = type.toLowerCase();
   if (g.includes("banning") || g.includes("brute")) return "bg-red-500/20 text-red-400 border-red-500/30";
   if (g.includes("unbanning")) return "bg-emerald-500/20 text-emerald-400 border-emerald-500/30";
   if (g.includes("improper") || g.includes("non_smtp") || g.includes("warning")) return "bg-amber-500/20 text-amber-400 border-amber-500/30";
@@ -23,12 +32,16 @@ const grundClass = (grund: string): string => {
 };
 
 type SortDir = "asc" | "desc" | null;
-type SortKey = "ip" | "treffer" | "level" | "quelle" | "grund" | "konto" | "last_seen" | "letzte_meldung" | "organisation" | "land" | "ptr" | "ziel_port";
+type SortKey =
+  | "ip" | "total_events" | "risk_score" | "risk_level" | "last_alert_level"
+  | "last_source_component" | "last_event_type" | "last_username"
+  | "last_seen" | "last_message" | "org_name" | "country" | "ptr"
+  | "last_destination_port";
 
 const AggressiveIPs30Days = () => {
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [openFilter, setOpenFilter] = useState<string | null>(null);
-  const [sortKey, setSortKey] = useState<SortKey>("treffer");
+  const [sortKey, setSortKey] = useState<SortKey>("risk_score");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const filterRef = useRef<HTMLDivElement>(null);
 
@@ -49,12 +62,28 @@ const AggressiveIPs30Days = () => {
     else { setSortKey(key); setSortDir("desc"); }
   };
 
+  const portLabel = (row: typeof mockAggressiveIPs30Days[number]) =>
+    row.last_destination_port
+      ? `${row.last_destination_port}${row.last_destination_service ? `/${row.last_destination_service}` : ""}`
+      : "-";
+
   const filtered = useMemo(() => {
     return mockAggressiveIPs30Days.filter((row) => {
       const vals: Record<string, string> = {
-        ip: row.ip, treffer: String(row.treffer), level: row.level, quelle: row.quelle,
-        grund: row.grund, konto: row.konto || "-", last_seen: formatTime(row.last_seen),
-        letzte_meldung: row.letzte_meldung, organisation: row.organisation, land: row.land, ptr: row.ptr, ziel_port: row.ziel_port,
+        ip: row.ip,
+        total_events: String(row.total_events),
+        risk_score: String(row.risk_score),
+        risk_level: row.risk_level,
+        last_alert_level: row.last_alert_level ?? "",
+        last_source_component: row.last_source_component ?? "",
+        last_event_type: row.last_event_type ?? "",
+        last_username: row.last_username ?? "-",
+        last_seen: formatTime(row.last_seen),
+        last_message: row.last_message ?? "",
+        org_name: row.org_name ?? "unbekannt",
+        country: row.country ?? "??",
+        ptr: row.ptr ?? "-",
+        last_destination_port: portLabel(row),
       };
       return Object.entries(filters).every(([key, search]) => !search || vals[key]?.toLowerCase().includes(search.toLowerCase()));
     });
@@ -66,17 +95,22 @@ const AggressiveIPs30Days = () => {
       let aVal: string | number = "", bVal: string | number = "";
       switch (sortKey) {
         case "ip": aVal = a.ip; bVal = b.ip; break;
-        case "treffer": aVal = a.treffer; bVal = b.treffer; break;
-        case "level": aVal = a.level; bVal = b.level; break;
-        case "quelle": aVal = a.quelle; bVal = b.quelle; break;
-        case "grund": aVal = a.grund; bVal = b.grund; break;
-        case "konto": aVal = a.konto || ""; bVal = b.konto || ""; break;
+        case "total_events": aVal = a.total_events; bVal = b.total_events; break;
+        case "risk_score": aVal = a.risk_score; bVal = b.risk_score; break;
+        case "risk_level": {
+          const order: Record<RiskLevel, number> = { LOW: 0, MEDIUM: 1, HIGH: 2, CRIT: 3 };
+          aVal = order[a.risk_level]; bVal = order[b.risk_level]; break;
+        }
+        case "last_alert_level": aVal = a.last_alert_level ?? ""; bVal = b.last_alert_level ?? ""; break;
+        case "last_source_component": aVal = a.last_source_component ?? ""; bVal = b.last_source_component ?? ""; break;
+        case "last_event_type": aVal = a.last_event_type ?? ""; bVal = b.last_event_type ?? ""; break;
+        case "last_username": aVal = a.last_username ?? ""; bVal = b.last_username ?? ""; break;
         case "last_seen": aVal = new Date(a.last_seen).getTime(); bVal = new Date(b.last_seen).getTime(); break;
-        case "letzte_meldung": aVal = a.letzte_meldung; bVal = b.letzte_meldung; break;
-        case "organisation": aVal = a.organisation; bVal = b.organisation; break;
-        case "land": aVal = a.land; bVal = b.land; break;
-        case "ptr": aVal = a.ptr; bVal = b.ptr; break;
-        case "ziel_port": aVal = a.ziel_port; bVal = b.ziel_port; break;
+        case "last_message": aVal = a.last_message ?? ""; bVal = b.last_message ?? ""; break;
+        case "org_name": aVal = a.org_name ?? ""; bVal = b.org_name ?? ""; break;
+        case "country": aVal = a.country ?? ""; bVal = b.country ?? ""; break;
+        case "ptr": aVal = a.ptr ?? ""; bVal = b.ptr ?? ""; break;
+        case "last_destination_port": aVal = portLabel(a); bVal = portLabel(b); break;
       }
       if (aVal < bVal) return sortDir === "asc" ? -1 : 1;
       if (aVal > bVal) return sortDir === "asc" ? 1 : -1;
@@ -86,17 +120,19 @@ const AggressiveIPs30Days = () => {
 
   const columns: { key: SortKey; label: string }[] = [
     { key: "ip", label: "ip" },
-    { key: "treffer", label: "treffer" },
-    { key: "level", label: "level" },
-    { key: "quelle", label: "quelle" },
-    { key: "grund", label: "grund" },
-    { key: "konto", label: "konto" },
+    { key: "risk_score", label: "risk_score" },
+    { key: "risk_level", label: "risk_level" },
+    { key: "total_events", label: "treffer" },
+    { key: "last_alert_level", label: "level" },
+    { key: "last_source_component", label: "quelle" },
+    { key: "last_event_type", label: "grund" },
+    { key: "last_username", label: "konto" },
     { key: "last_seen", label: "last_seen" },
-    { key: "letzte_meldung", label: "letzte_meldung" },
-    { key: "organisation", label: "organisation / ASN" },
-    { key: "land", label: "land" },
+    { key: "last_message", label: "letzte_meldung" },
+    { key: "org_name", label: "organisation / ASN" },
+    { key: "country", label: "land" },
     { key: "ptr", label: "PTR" },
-    { key: "ziel_port", label: "ziel_port" },
+    { key: "last_destination_port", label: "ziel_port" },
   ];
 
   return (
@@ -110,7 +146,9 @@ const AggressiveIPs30Days = () => {
             <Info className="h-3.5 w-3.5" />
           </button>
         </div>
-        <p className="text-xs text-muted-foreground mt-0.5">Top aggressive external IPs (30 Days)</p>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          JOIN ip_summary × ip_enrichment × ip_risk_score · sortiert nach Risk-Score
+        </p>
       </CardHeader>
 
       <CardContent className="p-0" ref={filterRef}>
@@ -119,7 +157,7 @@ const AggressiveIPs30Days = () => {
             <TableHeader>
               <TableRow className="border-border/20 hover:bg-transparent bg-transparent">
                 {columns.map((col) => (
-                  <TableHead key={col.key} className="text-xs font-normal text-muted-foreground px-3 py-2 relative">
+                  <TableHead key={col.key} className="text-xs font-normal text-muted-foreground px-3 py-2 relative whitespace-nowrap">
                     <div className="flex items-center gap-1.5">
                       <button onClick={() => handleSort(col.key)} className="flex items-center gap-1 hover:text-foreground transition-colors">
                         <span>{col.label}</span>
@@ -152,25 +190,36 @@ const AggressiveIPs30Days = () => {
             </TableHeader>
             <TableBody>
               {sorted.length === 0 ? (
-                <TableRow><TableCell colSpan={12} className="text-center text-muted-foreground text-xs py-8">Keine Ergebnisse</TableCell></TableRow>
+                <TableRow><TableCell colSpan={columns.length} className="text-center text-muted-foreground text-xs py-8">Keine Ergebnisse</TableCell></TableRow>
               ) : sorted.map((row, i) => (
                 <TableRow key={row.ip} className={`border-border/10 font-mono text-xs hover:bg-muted/30 transition-colors ${i % 2 === 0 ? "bg-transparent" : "bg-muted/10"}`}>
                   <TableCell className="text-foreground px-3 py-2">{row.ip}</TableCell>
-                  <TableCell className="text-foreground px-3 py-2">{row.treffer}</TableCell>
+                  <TableCell className="text-foreground px-3 py-2 font-semibold">{row.risk_score}</TableCell>
                   <TableCell className="px-3 py-2">
-                    <Badge variant="outline" className={`text-[10px] px-1.5 font-mono ${levelClass(row.level)}`}>{row.level}</Badge>
+                    <Badge variant="outline" className={`text-[10px] px-1.5 font-mono ${riskLevelClass(row.risk_level)}`}>{row.risk_level}</Badge>
                   </TableCell>
-                  <TableCell className="text-muted-foreground px-3 py-2">{row.quelle}</TableCell>
+                  <TableCell className="text-foreground px-3 py-2">{row.total_events}</TableCell>
                   <TableCell className="px-3 py-2">
-                    <Badge variant="outline" className={`text-[10px] px-1.5 font-mono ${grundClass(row.grund)}`}>{row.grund}</Badge>
+                    {row.last_alert_level && (
+                      <Badge variant="outline" className={`text-[10px] px-1.5 font-mono ${levelClass(row.last_alert_level)}`}>{row.last_alert_level}</Badge>
+                    )}
                   </TableCell>
-                  <TableCell className="text-muted-foreground px-3 py-2">{row.konto || "-"}</TableCell>
-                  <TableCell className="text-muted-foreground px-3 py-2">{formatTime(row.last_seen)}</TableCell>
-                  <TableCell className="text-muted-foreground px-3 py-2 max-w-[400px] truncate">{row.letzte_meldung}</TableCell>
-                  <TableCell className="text-muted-foreground px-3 py-2">{row.organisation}</TableCell>
-                  <TableCell className="text-muted-foreground px-3 py-2">{row.land}</TableCell>
-                  <TableCell className="text-muted-foreground px-3 py-2">{row.ptr}</TableCell>
-                  <TableCell className="text-muted-foreground px-3 py-2">{row.ziel_port}</TableCell>
+                  <TableCell className="text-muted-foreground px-3 py-2">{row.last_source_component ?? "-"}</TableCell>
+                  <TableCell className="px-3 py-2">
+                    {row.last_event_type && (
+                      <Badge variant="outline" className={`text-[10px] px-1.5 font-mono ${eventTypeClass(row.last_event_type)}`}>{row.last_event_type}</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground px-3 py-2">{row.last_username ?? "-"}</TableCell>
+                  <TableCell className="text-muted-foreground px-3 py-2 whitespace-nowrap">{formatTime(row.last_seen)}</TableCell>
+                  <TableCell className="text-muted-foreground px-3 py-2 max-w-[400px] truncate" title={row.last_message ?? ""}>{row.last_message ?? "-"}</TableCell>
+                  <TableCell className="text-muted-foreground px-3 py-2">
+                    <span className="text-foreground/80">{row.org_name ?? "unbekannt"}</span>
+                    {row.asn && <span className="ml-1 text-muted-foreground/60">({row.asn})</span>}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground px-3 py-2">{row.country ?? "??"}</TableCell>
+                  <TableCell className="text-muted-foreground px-3 py-2">{row.ptr ?? "-"}</TableCell>
+                  <TableCell className="text-muted-foreground px-3 py-2">{portLabel(row)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
