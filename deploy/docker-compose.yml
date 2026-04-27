@@ -135,7 +135,7 @@ services:
       - ${CERT_PATH}:/etc/nginx/certs:ro
     depends_on:
       - dashboard
-      - authentik
+      # authentik is optional (compose profile). proxy proxies to it if present.
 
   # ---------- Backup ----------
   backup:
