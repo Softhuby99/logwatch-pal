@@ -52,8 +52,9 @@ const CATEGORY_LABELS = {
   brute_force: { label: "Brute Force", color: "hsl(0 84% 60%)" },
   auth_failure: { label: "Auth Failure", color: "hsl(38 92% 50%)" },
   port_scan: { label: "Port Scan", color: "hsl(217 91% 60%)" },
-  ban: { label: "Ban/Unban", color: "hsl(280 70% 55%)" },
-  crawl_probe: { label: "Crawl/Probe", color: "hsl(142 71% 45%)" },
+  ban: { label: "Ban", color: "hsl(280 70% 55%)" },
+  unban: { label: "Unban", color: "hsl(142 71% 45%)" },
+  crawl_probe: { label: "Crawl/Probe", color: "hsl(160 60% 45%)" },
 } as const;
 
 const fmtRange = (startIso: string, endIso: string) => {

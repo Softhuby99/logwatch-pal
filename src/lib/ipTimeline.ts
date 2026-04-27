@@ -411,6 +411,7 @@ export interface AttackBucket {
   port_scan: number;
   auth_failure: number;
   ban: number;
+  unban: number;
   crawl_probe: number;
   total: number;
 }
@@ -418,8 +419,9 @@ export interface AttackBucket {
 /** Klassifiziert ein Event in eine Chart-Kategorie */
 const classifyForChart = (
   ev: IpTimelineEvent
-): "brute_force" | "port_scan" | "auth_failure" | "ban" | "crawl_probe" | null => {
-  if (ev.kind === "ban" || ev.kind === "unban") return "ban";
+): "brute_force" | "port_scan" | "auth_failure" | "ban" | "unban" | "crawl_probe" | null => {
+  if (ev.kind === "ban") return "ban";
+  if (ev.kind === "unban") return "unban";
   if (ev.kind === "auth_failure") {
     // wiederholte Auth-Fehler werden als brute_force gewertet, einzelne als auth_failure
     return ev.type_label?.includes("BRUTE") ? "brute_force" : "auth_failure";
@@ -473,6 +475,7 @@ export const buildAttackBuckets = (
       port_scan: 0,
       auth_failure: 0,
       ban: 0,
+      unban: 0,
       crawl_probe: 0,
       total: 0,
     });
@@ -498,7 +501,7 @@ export interface BucketDetail {
   bucket_end: string;
   bucket_hours: number;
   events: IpTimelineEvent[];
-  by_category: { brute_force: number; port_scan: number; auth_failure: number; ban: number; crawl_probe: number };
+  by_category: { brute_force: number; port_scan: number; auth_failure: number; ban: number; unban: number; crawl_probe: number };
   by_ip: Array<{
     ip: string;
     count: number;
@@ -508,7 +511,7 @@ export interface BucketDetail {
     org_name: string | null;
     risk_score: number;
     risk_level: "LOW" | "MEDIUM" | "HIGH" | "CRIT";
-    categories: { brute_force: number; port_scan: number; auth_failure: number; ban: number; crawl_probe: number };
+    categories: { brute_force: number; port_scan: number; auth_failure: number; ban: number; unban: number; crawl_probe: number };
   }>;
 }
 
@@ -527,7 +530,7 @@ export const getBucketDetail = (bucketStartIso: string, bucketHours = 4): Bucket
     })
     .sort((a, b) => new Date(b.event_time).getTime() - new Date(a.event_time).getTime());
 
-  const by_category = { brute_force: 0, port_scan: 0, auth_failure: 0, ban: 0, crawl_probe: 0 };
+  const by_category = { brute_force: 0, port_scan: 0, auth_failure: 0, ban: 0, unban: 0, crawl_probe: 0 };
   const ipMap = new Map<string, BucketDetail["by_ip"][number]>();
 
   events.forEach((ev) => {
@@ -567,7 +570,7 @@ export const getBucketDetail = (bucketStartIso: string, bucketHours = 4): Bucket
       org_name: enrich?.org_name ?? null,
       risk_score: risk?.score ?? 0,
       risk_level: risk?.risk_level ?? "LOW",
-      categories: { brute_force: 0, port_scan: 0, auth_failure: 0, ban: 0, crawl_probe: 0 },
+      categories: { brute_force: 0, port_scan: 0, auth_failure: 0, ban: 0, unban: 0, crawl_probe: 0 },
     };
     cur.count++;
     if (cat) cur.categories[cat]++;

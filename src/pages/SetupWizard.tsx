@@ -34,6 +34,7 @@ interface WizardState {
   enableHttps: boolean;
   certPath: string;
   // Authentik / SSO
+  installAuthentik: boolean;
   authentikUrl: string;
   authentikRealm: string;
   oidcClientId: string;
@@ -57,6 +58,7 @@ const DEFAULT_STATE: WizardState = {
   serverIp: "0.0.0.0",
   enableHttps: true,
   certPath: "./certs",
+  installAuthentik: true,
   authentikUrl: "https://auth.dashboard.local",
   authentikRealm: "dashboard",
   oidcClientId: "dashboard",
@@ -98,6 +100,9 @@ ENABLE_HTTPS=${s.enableHttps}
 CERT_PATH=${s.certPath}
 
 # --- SSO / Authentik ---
+# INSTALL_AUTHENTIK=true: Authentik wird im Compose mit-installiert.
+# false: bestehende Authentik-Instanz unter AUTHENTIK_URL wird genutzt.
+INSTALL_AUTHENTIK=${s.installAuthentik}
 AUTHENTIK_URL=${s.authentikUrl}
 AUTHENTIK_REALM=${s.authentikRealm}
 OIDC_CLIENT_ID=${s.oidcClientId}
@@ -226,7 +231,22 @@ export default function SetupWizard() {
 
         {Current.id === "sso" && (
           <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Authentik URL" value={state.authentikUrl} onChange={(v) => update("authentikUrl", v)} hint="Basis-URL des Authentik-Servers" />
+            <div className="md:col-span-2">
+              <Toggle
+                label="Authentik im Compose-Stack mit-installieren"
+                checked={state.installAuthentik}
+                onChange={(v) => update("installAuthentik", v)}
+                hint="Aktiv: Authentik-Server, -Worker, -DB & -Redis werden lokal gestartet (URL: https://<host>/auth/). Aus: bestehende Authentik-Instanz unter der unten angegebenen URL wird genutzt."
+              />
+            </div>
+            <Field
+              label="Authentik URL"
+              value={state.authentikUrl}
+              onChange={(v) => update("authentikUrl", v)}
+              hint={state.installAuthentik
+                ? "Wird bei der Installation auf https://<HOSTNAME>/auth/ gesetzt."
+                : "Basis-URL deiner bestehenden Authentik-Instanz (z. B. https://auth.example.com)."}
+            />
             <Field label="Authentik Realm / Slug" value={state.authentikRealm} onChange={(v) => update("authentikRealm", v)} />
             <Field label="OIDC Client-ID" value={state.oidcClientId} onChange={(v) => update("oidcClientId", v)} />
             <Field label="OIDC Client-Secret" value={state.oidcClientSecret} onChange={(v) => update("oidcClientSecret", v)} type="password" hint="Aus Authentik → Provider → Dashboard kopieren" />
@@ -239,13 +259,14 @@ export default function SetupWizard() {
                 <Toggle label="Microsoft / Entra" checked={state.ssoMicrosoft} onChange={(v) => update("ssoMicrosoft", v)} />
                 <Toggle label="SAML SSO" checked={state.ssoSaml} onChange={(v) => update("ssoSaml", v)} />
                 <Toggle label="Generic OIDC" checked={state.ssoOidc} onChange={(v) => update("ssoOidc", v)} />
-                <Toggle label="Email + Passwort" checked={state.ssoPassword} onChange={(v) => update("ssoPassword", v)} />
-                <Toggle label="Auth-Wall erzwingen" checked={state.authRequired} onChange={(v) => update("authRequired", v)} hint="Login zwingend, sonst freier Zugriff" />
+                <Toggle label="Email + Passwort (lokal)" checked={state.ssoPassword} onChange={(v) => update("ssoPassword", v)} hint="Lokales Authentik-Konto via username/password" />
+                <Toggle label="Auth-Wall erzwingen" checked={state.authRequired} onChange={(v) => update("authRequired", v)} hint="Aktiv: Dashboard nur nach Login zugänglich, leitet auf /login um. Aus: freier Zugriff (Preview-Modus)." />
               </div>
               <p className="text-xs text-muted-foreground">
                 Google / Microsoft / SAML werden als <strong>Federated Sources</strong>{" "}
                 in Authentik konfiguriert. Die Buttons hier blenden sie nur in
-                der Login-UI ein/aus.
+                der Login-UI ein/aus. Username + Passwort funktioniert direkt
+                gegen die lokale Authentik-Userdatenbank.
               </p>
             </div>
           </div>
