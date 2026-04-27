@@ -62,8 +62,12 @@ services:
         condition: service_healthy
 
   # ---------- Authentik (SSO) ----------
+  # Only started when INSTALL_AUTHENTIK=true (compose profile "authentik").
+  # If you point AUTHENTIK_URL to an existing Authentik instance, leave the
+  # COMPOSE_PROFILES env var unset and these services stay dormant.
   authentik-db:
     image: postgres:16-alpine
+    profiles: ["authentik"]
     restart: unless-stopped
     environment:
       POSTGRES_USER: authentik
@@ -79,6 +83,7 @@ services:
 
   authentik-redis:
     image: redis:7-alpine
+    profiles: ["authentik"]
     restart: unless-stopped
     command: --save 60 1 --loglevel warning
     volumes:
@@ -86,6 +91,7 @@ services:
 
   authentik:
     image: ghcr.io/goauthentik/server:2024.10
+    profiles: ["authentik"]
     restart: unless-stopped
     command: server
     environment: *authentik-env
@@ -100,6 +106,7 @@ services:
 
   authentik-worker:
     image: ghcr.io/goauthentik/server:2024.10
+    profiles: ["authentik"]
     restart: unless-stopped
     command: worker
     environment: *authentik-env
