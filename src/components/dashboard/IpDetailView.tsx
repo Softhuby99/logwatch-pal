@@ -120,6 +120,19 @@ const TimelineRow = ({ ev }: { ev: IpTimelineEvent }) => {
   );
 };
 
+const FullViewLink = ({ ip }: { ip: string }) => {
+  const navigate = useNavigate();
+  return (
+    <button
+      type="button"
+      onClick={() => navigate(`/ip/${encodeURIComponent(ip)}`)}
+      className="text-xs text-primary hover:underline flex items-center gap-1 whitespace-nowrap"
+    >
+      <ExternalLink className="h-3 w-3" /> Volle Ansicht
+    </button>
+  );
+};
+
 const IpDetailView = ({ ip, embedded = false }: Props) => {
   const data = useMemo(() => getIpTimeline(ip), [ip]);
   const { summary, enrichment, risk, events, stats, by_type, ban_intervals } = data;
