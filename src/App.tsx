@@ -5,6 +5,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Index from "./pages/Index.tsx";
 import NotFound from "./pages/NotFound.tsx";
+import IpDetailPage from "./pages/IpDetailPage.tsx";
+import { IpDetailProvider } from "./contexts/IpDetailContext";
 
 const queryClient = new QueryClient();
 
@@ -14,11 +16,14 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <IpDetailProvider>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/ip/:ip" element={<IpDetailPage />} />
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </IpDetailProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
