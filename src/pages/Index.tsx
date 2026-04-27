@@ -10,6 +10,7 @@ import TopAttackersTabbed from "@/components/dashboard/TopAttackersTabbed";
 import IPStats7Days from "@/components/dashboard/IPStats7Days";
 import AggressiveIPs30Days from "@/components/dashboard/AggressiveIPs30Days";
 import InternalAuthProblems from "@/components/dashboard/InternalAuthProblems";
+import GeoAttackMap from "@/components/dashboard/GeoAttackMap";
 import CollapsiblePanel from "@/components/dashboard/CollapsiblePanel";
 
 const Index = () => (
@@ -39,6 +40,10 @@ const Index = () => (
 
       <CollapsiblePanel title="Attack Timeline">
         <AttackTimelineChart />
+      </CollapsiblePanel>
+
+      <CollapsiblePanel title="GeoIP · Angriffsherkunft (Weltkarte)">
+        <GeoAttackMap />
       </CollapsiblePanel>
 
       <CollapsiblePanel title="Top Angreifer · 24h / 7T / 30T">
