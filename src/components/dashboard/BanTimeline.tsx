@@ -49,8 +49,9 @@ const fmtDuration = (ms: number) => {
   return h ? `${d}d ${h}h` : `${d}d`;
 };
 
-const BanTimeline = ({ intervals, compact = false }: Props) => {
+const BanTimeline = ({ intervals, compact = false, events = [] }: Props) => {
   const [hoverId, setHoverId] = useState<string | null>(null);
+  const [hoverEvId, setHoverEvId] = useState<string | null>(null);
 
   // Skala: vom ältesten Ban bis "jetzt"
   const { minMs, maxMs, totalMs, validIntervals } = useMemo(() => {
