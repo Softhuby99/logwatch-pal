@@ -306,3 +306,202 @@ export const getTopAttackers = (window: TimeWindow, limit = 25): TopAttackerRow[
     .sort((a, b) => b.risk_score - a.risk_score || b.total_events - a.total_events)
     .slice(0, limit);
 };
+
+// ============================================================
+// Attack Timeline Buckets (für Stacked-Area-Chart + Drilldown)
+// ============================================================
+
+export interface AttackBucket {
+  /** Bucket-Start als ISO */
+  time: string;
+  brute_force: number;
+  port_scan: number;
+  auth_failure: number;
+  ban: number;
+  crawl_probe: number;
+  total: number;
+}
+
+/** Klassifiziert ein Event in eine Chart-Kategorie */
+const classifyForChart = (
+  ev: IpTimelineEvent
+): "brute_force" | "port_scan" | "auth_failure" | "ban" | "crawl_probe" | null => {
+  if (ev.kind === "ban" || ev.kind === "unban") return "ban";
+  if (ev.kind === "auth_failure") {
+    // wiederholte Auth-Fehler werden als brute_force gewertet, einzelne als auth_failure
+    return ev.type_label?.includes("BRUTE") ? "brute_force" : "auth_failure";
+  }
+  if (ev.kind === "crowdsec") {
+    const t = (ev.type_label || "").toUpperCase();
+    if (t.includes("PROBING") || t.includes("SCAN") || t.includes("PORT")) return "port_scan";
+    if (t.includes("CRAWL") || t.includes("SENSITIVE") || t.includes("ADMIN") || t.includes("HTTP"))
+      return "crawl_probe";
+    return "crawl_probe";
+  }
+  if (ev.kind === "security_event") {
+    const t = (ev.type_label || "").toUpperCase();
+    if (t.includes("BRUTE")) return "brute_force";
+    if (t.includes("AUTH")) return "auth_failure";
+    return "crawl_probe";
+  }
+  return null;
+};
+
+/** Liefert alle Events als IpTimelineEvent (über alle IPs) */
+const allTimelineEvents = (): IpTimelineEvent[] => {
+  return [
+    ...mockSecurityEvents.map(toTimelineFromSecurity),
+    ...mockAuthEvents.filter((e) => e.ip).map(toTimelineFromAuth),
+  ];
+};
+
+/**
+ * Baut Buckets über die letzten `totalHours` Stunden, jeder Bucket ist `bucketHours` lang.
+ * Default: 7 Tage à 4h = 42 Buckets.
+ */
+export const buildAttackBuckets = (
+  bucketHours = 4,
+  totalHours = 24 * 7
+): AttackBucket[] => {
+  const bucketMs = bucketHours * 60 * 60 * 1000;
+  const totalMs = totalHours * 60 * 60 * 1000;
+  const now = Date.now();
+  // Bucket-Start = abgerundet auf bucketMs
+  const end = Math.floor(now / bucketMs) * bucketMs;
+  const start = end - totalMs;
+
+  const count = Math.ceil(totalMs / bucketMs);
+  const buckets: AttackBucket[] = [];
+  for (let i = 0; i < count; i++) {
+    const t = start + i * bucketMs;
+    buckets.push({
+      time: new Date(t).toISOString(),
+      brute_force: 0,
+      port_scan: 0,
+      auth_failure: 0,
+      ban: 0,
+      crawl_probe: 0,
+      total: 0,
+    });
+  }
+
+  const events = allTimelineEvents();
+  events.forEach((ev) => {
+    const t = new Date(ev.event_time).getTime();
+    if (t < start || t >= end + bucketMs) return;
+    const idx = Math.floor((t - start) / bucketMs);
+    if (idx < 0 || idx >= buckets.length) return;
+    const cat = classifyForChart(ev);
+    if (!cat) return;
+    buckets[idx][cat]++;
+    buckets[idx].total++;
+  });
+
+  return buckets;
+};
+
+export interface BucketDetail {
+  bucket_start: string;
+  bucket_end: string;
+  bucket_hours: number;
+  events: IpTimelineEvent[];
+  by_category: { brute_force: number; port_scan: number; auth_failure: number; ban: number; crawl_probe: number };
+  by_ip: Array<{
+    ip: string;
+    count: number;
+    last_seen: string;
+    last_alert_level: AlertLevel;
+    country: string | null;
+    org_name: string | null;
+    risk_score: number;
+    risk_level: "LOW" | "MEDIUM" | "HIGH" | "CRIT";
+    categories: { brute_force: number; port_scan: number; auth_failure: number; ban: number; crawl_probe: number };
+  }>;
+}
+
+/**
+ * Liefert alle Events innerhalb eines Bucket-Fensters.
+ * `bucketStartIso` ist der Start des Buckets (gleicher Wert wie in buildAttackBuckets()).
+ */
+export const getBucketDetail = (bucketStartIso: string, bucketHours = 4): BucketDetail => {
+  const start = new Date(bucketStartIso).getTime();
+  const end = start + bucketHours * 60 * 60 * 1000;
+
+  const events = allTimelineEvents()
+    .filter((ev) => {
+      const t = new Date(ev.event_time).getTime();
+      return t >= start && t < end;
+    })
+    .sort((a, b) => new Date(b.event_time).getTime() - new Date(a.event_time).getTime());
+
+  const by_category = { brute_force: 0, port_scan: 0, auth_failure: 0, ban: 0, crawl_probe: 0 };
+  const ipMap = new Map<string, BucketDetail["by_ip"][number]>();
+
+  events.forEach((ev) => {
+    const cat = classifyForChart(ev);
+    if (cat) by_category[cat]++;
+
+    const enrich = mockIPEnrichment.find((e) => e.ip === ev.id ? false : e.ip === (ev as any).ip);
+    // ipTimelineEvent hat keine "ip" – wir holen sie aus dem Original-Event über die ID
+    // Wir tracken per "id" prefix nicht möglich → wir machen es über Re-Lookup:
+  });
+
+  // Re-build with ip via the original sources to keep things simple
+  const secInWindow = mockSecurityEvents.filter((e) => {
+    const t = new Date(e.event_time).getTime();
+    return t >= start && t < end;
+  });
+  const authInWindow = mockAuthEvents.filter((e) => {
+    if (!e.ip) return false;
+    const t = new Date(e.event_time).getTime();
+    return t >= start && t < end;
+  });
+
+  const upsertIp = (
+    ip: string,
+    timeIso: string,
+    alert: AlertLevel,
+    cat: ReturnType<typeof classifyForChart>
+  ) => {
+    const enrich = mockIPEnrichment.find((e) => e.ip === ip);
+    const risk = mockIPRiskScore.find((r) => r.ip === ip);
+    const cur = ipMap.get(ip) ?? {
+      ip,
+      count: 0,
+      last_seen: timeIso,
+      last_alert_level: alert,
+      country: enrich?.country ?? null,
+      org_name: enrich?.org_name ?? null,
+      risk_score: risk?.score ?? 0,
+      risk_level: risk?.risk_level ?? "LOW",
+      categories: { brute_force: 0, port_scan: 0, auth_failure: 0, ban: 0, crawl_probe: 0 },
+    };
+    cur.count++;
+    if (cat) cur.categories[cat]++;
+    if (new Date(timeIso).getTime() > new Date(cur.last_seen).getTime()) {
+      cur.last_seen = timeIso;
+      cur.last_alert_level = alert;
+    }
+    ipMap.set(ip, cur);
+  };
+
+  secInWindow.forEach((e) =>
+    upsertIp(e.ip, e.event_time, e.alert_level, classifyForChart(toTimelineFromSecurity(e)))
+  );
+  authInWindow.forEach((e) =>
+    upsertIp(e.ip!, e.event_time, e.alert_level, classifyForChart(toTimelineFromAuth(e)))
+  );
+
+  const by_ip = Array.from(ipMap.values()).sort(
+    (a, b) => b.risk_score - a.risk_score || b.count - a.count
+  );
+
+  return {
+    bucket_start: new Date(start).toISOString(),
+    bucket_end: new Date(end).toISOString(),
+    bucket_hours: bucketHours,
+    events,
+    by_category,
+    by_ip,
+  };
+};
