@@ -6,7 +6,12 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Index from "./pages/Index.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import IpDetailPage from "./pages/IpDetailPage.tsx";
+import Login from "./pages/Login.tsx";
+import AuthCallback from "./pages/AuthCallback.tsx";
+import SetupWizard from "./pages/SetupWizard.tsx";
 import { IpDetailProvider } from "./contexts/IpDetailContext";
+import { AuthProvider } from "./contexts/AuthContext";
+import { RequireAuth } from "./components/auth/RequireAuth";
 
 const queryClient = new QueryClient();
 
@@ -16,14 +21,33 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <IpDetailProvider>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/ip/:ip" element={<IpDetailPage />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </IpDetailProvider>
+        <AuthProvider>
+          <IpDetailProvider>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/auth/callback" element={<AuthCallback />} />
+              <Route path="/setup" element={<SetupWizard />} />
+              <Route
+                path="/"
+                element={
+                  <RequireAuth>
+                    <Index />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="/ip/:ip"
+                element={
+                  <RequireAuth>
+                    <IpDetailPage />
+                  </RequireAuth>
+                }
+              />
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </IpDetailProvider>
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
