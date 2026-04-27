@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Shield } from "lucide-react";
-import { mockCrowdSecAlerts } from "@/data/mockSecurityData";
+import { mockCrowdSecAlertsLegacy as mockCrowdSecAlerts } from "@/data/mockSecurityData";
 
 const levelColor = (l: string) => (l === "CRIT" ? "destructive" : "secondary");
 
