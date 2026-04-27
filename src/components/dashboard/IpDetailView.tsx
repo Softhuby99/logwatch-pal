@@ -29,6 +29,7 @@ import {
 import { format } from "date-fns";
 import { getIpTimeline, type IpTimelineEvent, type TimelineEventKind } from "@/lib/ipTimeline";
 import BanTimeline from "./BanTimeline";
+import IpActivityChart from "./IpActivityChart";
 import type { AlertLevel, RiskLevel } from "@/types/database";
 
 interface Props {
@@ -121,15 +122,7 @@ const TimelineRow = ({ ev }: { ev: IpTimelineEvent }) => {
 
 const IpDetailView = ({ ip, embedded = false }: Props) => {
   const data = useMemo(() => getIpTimeline(ip), [ip]);
-  const { summary, enrichment, risk, events, stats, daily, by_type, ban_intervals } = data;
-
-  const dailyChartData = daily.map((d) => ({
-    date: d.date.slice(5), // MM-DD
-    Bans: d.bans,
-    "Auth Failures": d.auth_failures,
-    CrowdSec: d.crowdsec,
-    Andere: d.other,
-  }));
+  const { summary, enrichment, risk, events, stats, by_type, ban_intervals } = data;
 
   return (
     <div className={embedded ? "space-y-4" : "space-y-6"}>
