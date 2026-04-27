@@ -295,6 +295,7 @@ export const getIpTimeline = (ip: string): IpTimelineBundle => {
     stats,
     daily: computeDaily(events),
     by_type,
+    ban_intervals: computeBanIntervals(events),
   };
 };
 
