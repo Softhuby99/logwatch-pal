@@ -97,6 +97,13 @@ export const iso3ToIso2 = (iso3: string): string | null => {
 // Country Aggregation
 // ============================================================
 
+export interface RegionAttackStat {
+  region: string;
+  unique_ips: number;
+  total_events: number;
+  bans: number;
+}
+
 export interface CountryAttackStat {
   iso2: string;
   iso3: string | null;
@@ -110,7 +117,65 @@ export interface CountryAttackStat {
   max_risk_score: number;
   /** Basis für Choropleth-Färbung (gewichtete Summe) */
   attack_weight: number;
+  /** Aufschlüsselung pro Region (für Bubble-Marker auf der Karte) */
+  regions: RegionAttackStat[];
 }
+
+// ----- Mock-Region per IP (deterministisch) -----
+// Für die Demo gibt es keine echten Region-Daten in mockIPEnrichment.
+// Wir leiten pro Land aus einer kurzen Region-Liste deterministisch über
+// einen Hash der IP eine Region ab. Das produziert stabile, plausible Daten
+// (gleiche IP → gleiche Region) – die echte FastAPI ersetzt das später durch
+// die `region`-Spalte aus der ip_enrichment Tabelle.
+const REGIONS_BY_COUNTRY: Record<string, string[]> = {
+  RU: ["Moskau", "St. Petersburg", "Nowosibirsk", "Jekaterinburg"],
+  UA: ["Kyiv", "Charkiw", "Odessa", "Lwiw"],
+  BD: ["Dhaka", "Chittagong", "Khulna"],
+  NL: ["Nordholland", "Südholland", "Utrecht"],
+  GB: ["London", "Manchester", "Edinburgh"],
+  EE: ["Harju", "Tartu"],
+  US: ["California", "Virginia", "Texas", "New York", "Oregon"],
+  DE: ["Berlin", "Bayern", "Hessen", "Nordrhein-Westfalen"],
+  CN: ["Peking", "Shanghai", "Guangdong", "Zhejiang"],
+  IN: ["Maharashtra", "Karnataka", "Delhi", "Tamil Nadu"],
+  BR: ["São Paulo", "Rio de Janeiro", "Minas Gerais"],
+  FR: ["Île-de-France", "Provence", "Auvergne-Rhône-Alpes"],
+  IT: ["Lombardei", "Latium", "Kampanien"],
+  ES: ["Madrid", "Katalonien", "Andalusien"],
+  PL: ["Masowien", "Schlesien", "Pommern"],
+  TR: ["Istanbul", "Ankara", "Izmir"],
+  IR: ["Teheran", "Isfahan", "Maschhad"],
+  KP: ["Pjöngjang"],
+  KR: ["Seoul", "Busan"],
+  JP: ["Tokio", "Osaka"],
+  VN: ["Hanoi", "Ho-Chi-Minh-Stadt"],
+  ID: ["Jakarta", "Java"],
+  PK: ["Punjab", "Sindh"],
+  RO: ["București", "Cluj"],
+  BG: ["Sofia"],
+  CZ: ["Prag"],
+  CH: ["Zürich", "Genf"],
+  AT: ["Wien", "Steiermark"],
+  SE: ["Stockholm"],
+  CA: ["Ontario", "Quebec"],
+  HK: ["Hongkong"],
+  SG: ["Singapur"],
+  AE: ["Dubai", "Abu Dhabi"],
+  ZA: ["Gauteng", "Westkap"],
+  MX: ["CDMX", "Jalisco"],
+  AR: ["Buenos Aires"],
+};
+
+const hashString = (s: string) => {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+};
+
+export const regionForIp = (iso2: string, ip: string): string => {
+  const list = REGIONS_BY_COUNTRY[iso2.toUpperCase()] ?? ["Unbekannt"];
+  return list[hashString(ip) % list.length];
+};
 
 const eventCountByIp = (): Map<string, { events: number; bans: number; authFails: number; crit: number; warn: number }> => {
   const map = new Map<
@@ -150,7 +215,7 @@ export const getCountryAttackStats = (): CountryAttackStat[] => {
     const stats = ipStats.get(enr.ip);
     if (!stats || stats.events === 0) return;
     const risk = mockIPRiskScore.find((r) => r.ip === enr.ip);
-    const cur = map.get(iso2) ?? {
+    const cur: CountryAttackStat = map.get(iso2) ?? {
       iso2,
       iso3: iso2ToIso3(iso2),
       name: iso2ToName(iso2),
@@ -162,6 +227,7 @@ export const getCountryAttackStats = (): CountryAttackStat[] => {
       warn_events: 0,
       max_risk_score: 0,
       attack_weight: 0,
+      regions: [],
     };
     cur.unique_ips++;
     cur.total_events += stats.events;
@@ -172,10 +238,25 @@ export const getCountryAttackStats = (): CountryAttackStat[] => {
     cur.max_risk_score = Math.max(cur.max_risk_score, risk?.score ?? 0);
     // gewichtet: bans×3 + crit×2 + events
     cur.attack_weight += stats.bans * 3 + stats.crit * 2 + stats.events;
+
+    // Region-Aufschlüsselung
+    const region = regionForIp(iso2, enr.ip);
+    let r = cur.regions.find((x) => x.region === region);
+    if (!r) {
+      r = { region, unique_ips: 0, total_events: 0, bans: 0 };
+      cur.regions.push(r);
+    }
+    r.unique_ips++;
+    r.total_events += stats.events;
+    r.bans += stats.bans;
+
     map.set(iso2, cur);
   });
 
-  return Array.from(map.values()).sort((a, b) => b.attack_weight - a.attack_weight);
+  // Regionen pro Land nach IP-Anzahl sortieren
+  const result = Array.from(map.values());
+  result.forEach((c) => c.regions.sort((a, b) => b.unique_ips - a.unique_ips));
+  return result.sort((a, b) => b.attack_weight - a.attack_weight);
 };
 
 // ============================================================
