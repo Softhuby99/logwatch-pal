@@ -259,6 +259,48 @@ const BanTimeline = ({ intervals, compact = false, events = [] }: Props) => {
               </div>
             );
           })}
+
+          {/* Angriffs-Spur (untere Hälfte) */}
+          {attackEvents.length > 0 && (
+            <div className="absolute left-0 right-0 top-[70%] h-px bg-border/30" />
+          )}
+          {attackEvents.map(({ ev, t }) => {
+            const leftPct = ((t - minMs) / totalMs) * 100;
+            const meta = ATTACK_KIND_META[ev.kind]!;
+            const isHover = hoverEvId === ev.id;
+            return (
+              <div
+                key={`atk-${ev.id}`}
+                className="absolute group"
+                style={{ left: `${leftPct}%`, top: "70%", transform: "translate(-50%, -50%)" }}
+                onMouseEnter={() => setHoverEvId(ev.id)}
+                onMouseLeave={() => setHoverEvId(null)}
+              >
+                <div
+                  className={`w-1.5 h-1.5 rounded-full ${meta.color} ring-1 ${meta.ring} cursor-pointer ${
+                    isHover ? "scale-[2.2]" : "hover:scale-150"
+                  } transition-transform`}
+                />
+                {isHover && (
+                  <div
+                    className="absolute z-30 bg-popover border border-border/60 rounded px-2 py-1 shadow-lg text-[10px] font-mono whitespace-nowrap pointer-events-none"
+                    style={{
+                      bottom: "calc(100% + 6px)",
+                      left: "50%",
+                      transform: "translateX(-50%)",
+                    }}
+                  >
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <span className={`w-1.5 h-1.5 rounded-full ${meta.color}`} />
+                      <span className="text-foreground font-semibold">{meta.label}</span>
+                    </div>
+                    <div className="text-muted-foreground">{fmtFull(ev.event_time)}</div>
+                    <div className="text-foreground/80 max-w-[260px] truncate">{ev.type_label}</div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         {/* Tick-Labels */}
