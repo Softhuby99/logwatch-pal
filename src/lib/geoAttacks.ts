@@ -215,7 +215,7 @@ export const getCountryAttackStats = (): CountryAttackStat[] => {
     const stats = ipStats.get(enr.ip);
     if (!stats || stats.events === 0) return;
     const risk = mockIPRiskScore.find((r) => r.ip === enr.ip);
-    const cur = map.get(iso2) ?? {
+    const cur: CountryAttackStat = map.get(iso2) ?? {
       iso2,
       iso3: iso2ToIso3(iso2),
       name: iso2ToName(iso2),
@@ -227,6 +227,7 @@ export const getCountryAttackStats = (): CountryAttackStat[] => {
       warn_events: 0,
       max_risk_score: 0,
       attack_weight: 0,
+      regions: [],
     };
     cur.unique_ips++;
     cur.total_events += stats.events;
@@ -237,10 +238,25 @@ export const getCountryAttackStats = (): CountryAttackStat[] => {
     cur.max_risk_score = Math.max(cur.max_risk_score, risk?.score ?? 0);
     // gewichtet: bans×3 + crit×2 + events
     cur.attack_weight += stats.bans * 3 + stats.crit * 2 + stats.events;
+
+    // Region-Aufschlüsselung
+    const region = regionForIp(iso2, enr.ip);
+    let r = cur.regions.find((x) => x.region === region);
+    if (!r) {
+      r = { region, unique_ips: 0, total_events: 0, bans: 0 };
+      cur.regions.push(r);
+    }
+    r.unique_ips++;
+    r.total_events += stats.events;
+    r.bans += stats.bans;
+
     map.set(iso2, cur);
   });
 
-  return Array.from(map.values()).sort((a, b) => b.attack_weight - a.attack_weight);
+  // Regionen pro Land nach IP-Anzahl sortieren
+  const result = Array.from(map.values());
+  result.forEach((c) => c.regions.sort((a, b) => b.unique_ips - a.unique_ips));
+  return result.sort((a, b) => b.attack_weight - a.attack_weight);
 };
 
 // ============================================================
