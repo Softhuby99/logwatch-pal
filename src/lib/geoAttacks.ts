@@ -24,46 +24,59 @@ import type { AlertLevel } from "@/types/database";
 
 interface CountryInfo {
   iso3: string;
+  /** ISO numeric (3-stellig, gepolstert) – key in world-atlas TopoJSON */
+  isoN: string;
   name: string;
 }
 
 const COUNTRY_TABLE: Record<string, CountryInfo> = {
-  RU: { iso3: "RUS", name: "Russland" },
-  UA: { iso3: "UKR", name: "Ukraine" },
-  BD: { iso3: "BGD", name: "Bangladesch" },
-  NL: { iso3: "NLD", name: "Niederlande" },
-  GB: { iso3: "GBR", name: "Großbritannien" },
-  EE: { iso3: "EST", name: "Estland" },
-  US: { iso3: "USA", name: "USA" },
-  DE: { iso3: "DEU", name: "Deutschland" },
-  CN: { iso3: "CHN", name: "China" },
-  IN: { iso3: "IND", name: "Indien" },
-  BR: { iso3: "BRA", name: "Brasilien" },
-  FR: { iso3: "FRA", name: "Frankreich" },
-  IT: { iso3: "ITA", name: "Italien" },
-  ES: { iso3: "ESP", name: "Spanien" },
-  PL: { iso3: "POL", name: "Polen" },
-  TR: { iso3: "TUR", name: "Türkei" },
-  IR: { iso3: "IRN", name: "Iran" },
-  KP: { iso3: "PRK", name: "Nordkorea" },
-  KR: { iso3: "KOR", name: "Südkorea" },
-  JP: { iso3: "JPN", name: "Japan" },
-  VN: { iso3: "VNM", name: "Vietnam" },
-  ID: { iso3: "IDN", name: "Indonesien" },
-  PK: { iso3: "PAK", name: "Pakistan" },
-  RO: { iso3: "ROU", name: "Rumänien" },
-  BG: { iso3: "BGR", name: "Bulgarien" },
-  CZ: { iso3: "CZE", name: "Tschechien" },
-  CH: { iso3: "CHE", name: "Schweiz" },
-  AT: { iso3: "AUT", name: "Österreich" },
-  SE: { iso3: "SWE", name: "Schweden" },
-  CA: { iso3: "CAN", name: "Kanada" },
-  HK: { iso3: "HKG", name: "Hongkong" },
-  SG: { iso3: "SGP", name: "Singapur" },
-  AE: { iso3: "ARE", name: "Vereinigte Arabische Emirate" },
-  ZA: { iso3: "ZAF", name: "Südafrika" },
-  MX: { iso3: "MEX", name: "Mexiko" },
-  AR: { iso3: "ARG", name: "Argentinien" },
+  RU: { iso3: "RUS", isoN: "643", name: "Russland" },
+  UA: { iso3: "UKR", isoN: "804", name: "Ukraine" },
+  BD: { iso3: "BGD", isoN: "050", name: "Bangladesch" },
+  NL: { iso3: "NLD", isoN: "528", name: "Niederlande" },
+  GB: { iso3: "GBR", isoN: "826", name: "Großbritannien" },
+  EE: { iso3: "EST", isoN: "233", name: "Estland" },
+  US: { iso3: "USA", isoN: "840", name: "USA" },
+  DE: { iso3: "DEU", isoN: "276", name: "Deutschland" },
+  CN: { iso3: "CHN", isoN: "156", name: "China" },
+  IN: { iso3: "IND", isoN: "356", name: "Indien" },
+  BR: { iso3: "BRA", isoN: "076", name: "Brasilien" },
+  FR: { iso3: "FRA", isoN: "250", name: "Frankreich" },
+  IT: { iso3: "ITA", isoN: "380", name: "Italien" },
+  ES: { iso3: "ESP", isoN: "724", name: "Spanien" },
+  PL: { iso3: "POL", isoN: "616", name: "Polen" },
+  TR: { iso3: "TUR", isoN: "792", name: "Türkei" },
+  IR: { iso3: "IRN", isoN: "364", name: "Iran" },
+  KP: { iso3: "PRK", isoN: "408", name: "Nordkorea" },
+  KR: { iso3: "KOR", isoN: "410", name: "Südkorea" },
+  JP: { iso3: "JPN", isoN: "392", name: "Japan" },
+  VN: { iso3: "VNM", isoN: "704", name: "Vietnam" },
+  ID: { iso3: "IDN", isoN: "360", name: "Indonesien" },
+  PK: { iso3: "PAK", isoN: "586", name: "Pakistan" },
+  RO: { iso3: "ROU", isoN: "642", name: "Rumänien" },
+  BG: { iso3: "BGR", isoN: "100", name: "Bulgarien" },
+  CZ: { iso3: "CZE", isoN: "203", name: "Tschechien" },
+  CH: { iso3: "CHE", isoN: "756", name: "Schweiz" },
+  AT: { iso3: "AUT", isoN: "040", name: "Österreich" },
+  SE: { iso3: "SWE", isoN: "752", name: "Schweden" },
+  CA: { iso3: "CAN", isoN: "124", name: "Kanada" },
+  HK: { iso3: "HKG", isoN: "344", name: "Hongkong" },
+  SG: { iso3: "SGP", isoN: "702", name: "Singapur" },
+  AE: { iso3: "ARE", isoN: "784", name: "Vereinigte Arabische Emirate" },
+  ZA: { iso3: "ZAF", isoN: "710", name: "Südafrika" },
+  MX: { iso3: "MEX", isoN: "484", name: "Mexiko" },
+  AR: { iso3: "ARG", isoN: "032", name: "Argentinien" },
+};
+
+export const iso2ToIsoN = (iso2: string | null | undefined): string | null =>
+  iso2 ? COUNTRY_TABLE[iso2.toUpperCase()]?.isoN ?? null : null;
+
+export const isoNToIso2 = (isoN: string): string | null => {
+  const padded = String(isoN).padStart(3, "0");
+  for (const [k, v] of Object.entries(COUNTRY_TABLE)) {
+    if (v.isoN === padded) return k;
+  }
+  return null;
 };
 
 export const iso2ToIso3 = (iso2: string | null | undefined): string | null =>
