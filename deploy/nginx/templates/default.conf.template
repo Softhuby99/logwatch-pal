@@ -1,0 +1,51 @@
+# Front-facing reverse proxy (HTTP + HTTPS).
+# `${HOSTNAME}` is substituted by the nginx env-template module.
+
+# ---------- HTTP ----------
+server {
+  listen 80;
+  server_name ${HOSTNAME};
+
+  # Authentik served under /auth/
+  location /auth/ {
+    proxy_pass http://authentik:9000/;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+  }
+
+  # Dashboard SPA
+  location / {
+    proxy_pass http://dashboard:80;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+  }
+}
+
+# ---------- HTTPS ----------
+# Only active when fullchain.pem + privkey.pem exist in /etc/nginx/certs/
+server {
+  listen 443 ssl;
+  http2 on;
+  server_name ${HOSTNAME};
+
+  ssl_certificate     /etc/nginx/certs/fullchain.pem;
+  ssl_certificate_key /etc/nginx/certs/privkey.pem;
+  ssl_protocols TLSv1.2 TLSv1.3;
+  ssl_prefer_server_ciphers on;
+
+  location /auth/ {
+    proxy_pass http://authentik:9000/;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto https;
+  }
+
+  location / {
+    proxy_pass http://dashboard:80;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto https;
+  }
+}
