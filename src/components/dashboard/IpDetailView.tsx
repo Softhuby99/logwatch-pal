@@ -185,7 +185,7 @@ const IpDetailView = ({ ip, embedded = false }: Props) => {
       </div>
 
       {/* Ban-Historie (eigene Zeitlinie) */}
-      <BanTimeline intervals={ban_intervals} compact={embedded} />
+      <BanTimeline intervals={ban_intervals} compact={embedded} events={events} />
 
       {/* Aktivität (24h / 7T / 30T / 90T / einzelnes Datum) */}
       <IpActivityChart events={events} />
