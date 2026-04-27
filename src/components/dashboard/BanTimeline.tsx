@@ -157,9 +157,9 @@ const BanTimeline = ({ intervals, compact = false, events = [] }: Props) => {
 
       {/* Horizontal Timeline */}
       <div className="px-3 pt-4 pb-2">
-        <div className="relative h-12">
-          {/* Achse */}
-          <div className="absolute left-0 right-0 top-1/2 h-px bg-border/40" />
+        <div className="relative h-16">
+          {/* Achse (oben für Bans, Mitte für Angriffe) */}
+          <div className="absolute left-0 right-0 top-[28%] h-px bg-border/40" />
 
           {/* "Jetzt"-Marker */}
           {nowPct >= 0 && nowPct <= 100 && (
