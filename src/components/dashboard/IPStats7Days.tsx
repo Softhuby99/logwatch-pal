@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { mockIPSummary } from "@/data/mockSecurityData";
 import { format } from "date-fns";
 import { ChevronDown, ChevronUp, Filter, Info } from "lucide-react";
+import { useIpDetail } from "@/contexts/IpDetailContext";
 
 const eventTypeColor = (type: string): string => {
   const t = type.toLowerCase();
@@ -26,6 +27,7 @@ type SortDir = "asc" | "desc" | null;
 type SortKey = "ip" | "total_events" | "first_seen" | "last_seen" | "last_target_email" | "last_event_type";
 
 const IPStats7Days = () => {
+  const { openIp } = useIpDetail();
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [openFilter, setOpenFilter] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("total_events");
@@ -214,11 +216,12 @@ const IPStats7Days = () => {
                 sorted.map((ip, i) => (
                   <TableRow
                     key={ip.ip}
-                    className={`border-border/10 font-mono text-xs hover:bg-muted/30 transition-colors ${
+                    onClick={() => openIp(ip.ip)}
+                    className={`border-border/10 font-mono text-xs cursor-pointer hover:bg-muted/30 transition-colors ${
                       i % 2 === 0 ? "bg-transparent" : "bg-muted/10"
                     }`}
                   >
-                    <TableCell className="text-foreground px-3 py-2">{ip.ip}</TableCell>
+                    <TableCell className="text-primary hover:underline font-medium px-3 py-2">{ip.ip}</TableCell>
                     <TableCell className="text-foreground px-3 py-2">{ip.total_events}</TableCell>
                     <TableCell className="text-muted-foreground px-3 py-2">{formatTime(ip.first_seen)}</TableCell>
                     <TableCell className="text-muted-foreground px-3 py-2">{formatTime(ip.last_seen)}</TableCell>
