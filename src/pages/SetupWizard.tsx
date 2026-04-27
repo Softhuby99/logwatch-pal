@@ -92,6 +92,7 @@ BACKUP_PATH=${s.backupPath}
 BACKUP_CRON=${s.backupCron}
 
 # --- Web ---
+SERVER_IP=${s.serverIp}
 HOSTNAME=${s.hostname}
 ENABLE_HTTPS=${s.enableHttps}
 CERT_PATH=${s.certPath}
