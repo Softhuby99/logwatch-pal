@@ -185,7 +185,7 @@ const BanTimeline = ({ intervals, compact = false, events = [] }: Props) => {
             return (
               <div
                 key={iv.id}
-                className="absolute top-1/2 -translate-y-1/2 group cursor-pointer"
+                className="absolute top-[28%] -translate-y-1/2 group cursor-pointer"
                 style={{ left: `${leftPct}%`, width: `${widthPct}%` }}
                 onMouseEnter={() => setHoverId(iv.id)}
                 onMouseLeave={() => setHoverId(null)}
