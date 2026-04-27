@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { getIpTimeline, type IpTimelineEvent, type TimelineEventKind } from "@/lib/ipTimeline";
+import BanTimeline from "./BanTimeline";
 import type { AlertLevel, RiskLevel } from "@/types/database";
 
 interface Props {
@@ -120,7 +121,7 @@ const TimelineRow = ({ ev }: { ev: IpTimelineEvent }) => {
 
 const IpDetailView = ({ ip, embedded = false }: Props) => {
   const data = useMemo(() => getIpTimeline(ip), [ip]);
-  const { summary, enrichment, risk, events, stats, daily, by_type } = data;
+  const { summary, enrichment, risk, events, stats, daily, by_type, ban_intervals } = data;
 
   const dailyChartData = daily.map((d) => ({
     date: d.date.slice(5), // MM-DD
@@ -183,6 +184,9 @@ const IpDetailView = ({ ip, embedded = false }: Props) => {
         <StatTile label="CrowdSec" value={stats.crowdsec} accent="text-blue-400" />
         <StatTile label="Andere" value={stats.other} accent="text-orange-400" />
       </div>
+
+      {/* Ban-Historie (eigene Zeitlinie) */}
+      <BanTimeline intervals={ban_intervals} compact={embedded} />
 
       {/* Daily Stacked Area */}
       <div className="border border-border/40 rounded bg-card/60 p-3">
