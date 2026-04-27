@@ -1,0 +1,37 @@
+# Build stage – produces the static React bundle with env-vars baked in
+FROM node:20-alpine AS build
+WORKDIR /app
+
+# Vite needs these at build time
+ARG VITE_AUTH_REQUIRED
+ARG VITE_OIDC_AUTHORITY
+ARG VITE_OIDC_CLIENT_ID
+ARG VITE_OIDC_REDIRECT_URI
+ARG VITE_OIDC_POST_LOGOUT_URI
+ARG VITE_SSO_GOOGLE_ENABLED
+ARG VITE_SSO_MICROSOFT_ENABLED
+ARG VITE_SSO_SAML_ENABLED
+ARG VITE_SSO_OIDC_ENABLED
+ARG VITE_SSO_PASSWORD_ENABLED
+
+ENV VITE_AUTH_REQUIRED=${VITE_AUTH_REQUIRED} \
+    VITE_OIDC_AUTHORITY=${VITE_OIDC_AUTHORITY} \
+    VITE_OIDC_CLIENT_ID=${VITE_OIDC_CLIENT_ID} \
+    VITE_OIDC_REDIRECT_URI=${VITE_OIDC_REDIRECT_URI} \
+    VITE_OIDC_POST_LOGOUT_URI=${VITE_OIDC_POST_LOGOUT_URI} \
+    VITE_SSO_GOOGLE_ENABLED=${VITE_SSO_GOOGLE_ENABLED} \
+    VITE_SSO_MICROSOFT_ENABLED=${VITE_SSO_MICROSOFT_ENABLED} \
+    VITE_SSO_SAML_ENABLED=${VITE_SSO_SAML_ENABLED} \
+    VITE_SSO_OIDC_ENABLED=${VITE_SSO_OIDC_ENABLED} \
+    VITE_SSO_PASSWORD_ENABLED=${VITE_SSO_PASSWORD_ENABLED}
+
+COPY package.json bun.lock* ./
+RUN npm install -g bun && bun install --frozen-lockfile
+COPY . .
+RUN bun run build
+
+# Runtime stage – tiny nginx, served by the proxy container
+FROM nginx:1.27-alpine
+COPY --from=build /app/dist /usr/share/nginx/html
+COPY deploy/nginx/dashboard.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
