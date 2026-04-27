@@ -176,17 +176,20 @@ const IpActivityChart = ({ events }: Props) => {
   const totals = useMemo(() => {
     return chartData.reduce(
       (acc, r) => ({
-        Bans: acc.Bans + r.Bans,
+        "Brute Force": acc["Brute Force"] + r["Brute Force"],
         "Auth Failures": acc["Auth Failures"] + r["Auth Failures"],
-        CrowdSec: acc.CrowdSec + r.CrowdSec,
-        Andere: acc.Andere + r.Andere,
+        "Port Scan": acc["Port Scan"] + r["Port Scan"],
+        Bans: acc.Bans + r.Bans,
+        Unbans: acc.Unbans + r.Unbans,
+        "Crawl/Probe": acc["Crawl/Probe"] + r["Crawl/Probe"],
       }),
-      { Bans: 0, "Auth Failures": 0, CrowdSec: 0, Andere: 0 }
+      { "Brute Force": 0, "Auth Failures": 0, "Port Scan": 0, Bans: 0, Unbans: 0, "Crawl/Probe": 0 }
     );
   }, [chartData]);
 
   const totalEvents =
-    totals.Bans + totals["Auth Failures"] + totals.CrowdSec + totals.Andere;
+    totals["Brute Force"] + totals["Auth Failures"] + totals["Port Scan"] +
+    totals.Bans + totals.Unbans + totals["Crawl/Probe"];
 
   // Smart tick gap je nach Bucket-Anzahl
   const minTickGap = chartData.length > 60 ? 50 : chartData.length > 24 ? 30 : 10;
@@ -263,26 +266,20 @@ const IpActivityChart = ({ events }: Props) => {
 
       {/* Mini-Totals */}
       <div className="flex items-center gap-3 mb-2 flex-wrap text-[10px] font-mono">
-        <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-red-500" />
-          <span className="text-muted-foreground">Bans:</span>
-          <span className="text-foreground">{totals.Bans}</span>
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-amber-500" />
-          <span className="text-muted-foreground">Auth-Fail:</span>
-          <span className="text-foreground">{totals["Auth Failures"]}</span>
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-blue-500" />
-          <span className="text-muted-foreground">CrowdSec:</span>
-          <span className="text-foreground">{totals.CrowdSec}</span>
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-orange-500" />
-          <span className="text-muted-foreground">Andere:</span>
-          <span className="text-foreground">{totals.Andere}</span>
-        </span>
+        {([
+          ["Brute Force", "bg-red-500"],
+          ["Auth Failures", "bg-amber-500"],
+          ["Port Scan", "bg-blue-500"],
+          ["Bans", "bg-fuchsia-500"],
+          ["Unbans", "bg-emerald-500"],
+          ["Crawl/Probe", "bg-teal-500"],
+        ] as Array<[keyof typeof totals, string]>).map(([key, dot]) => (
+          <span key={key} className="flex items-center gap-1">
+            <span className={`w-2 h-2 rounded-full ${dot}`} />
+            <span className="text-muted-foreground">{key}:</span>
+            <span className="text-foreground">{totals[key]}</span>
+          </span>
+        ))}
       </div>
 
       {/* Chart */}
@@ -295,22 +292,19 @@ const IpActivityChart = ({ events }: Props) => {
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={chartData} margin={{ top: 5, right: 8, bottom: 0, left: -25 }}>
               <defs>
-                <linearGradient id="g-act-bans" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="hsl(0 84% 60%)" stopOpacity={0.5} />
-                  <stop offset="100%" stopColor="hsl(0 84% 60%)" stopOpacity={0.05} />
-                </linearGradient>
-                <linearGradient id="g-act-auth" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="hsl(38 92% 50%)" stopOpacity={0.5} />
-                  <stop offset="100%" stopColor="hsl(38 92% 50%)" stopOpacity={0.05} />
-                </linearGradient>
-                <linearGradient id="g-act-crowd" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="hsl(217 91% 60%)" stopOpacity={0.5} />
-                  <stop offset="100%" stopColor="hsl(217 91% 60%)" stopOpacity={0.05} />
-                </linearGradient>
-                <linearGradient id="g-act-other" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="hsl(25 95% 53%)" stopOpacity={0.5} />
-                  <stop offset="100%" stopColor="hsl(25 95% 53%)" stopOpacity={0.05} />
-                </linearGradient>
+                {[
+                  ["g-act-brute", "hsl(0 84% 60%)"],
+                  ["g-act-auth", "hsl(38 92% 50%)"],
+                  ["g-act-port", "hsl(217 91% 60%)"],
+                  ["g-act-ban", "hsl(290 70% 55%)"],
+                  ["g-act-unban", "hsl(142 71% 45%)"],
+                  ["g-act-crawl", "hsl(180 60% 45%)"],
+                ].map(([id, color]) => (
+                  <linearGradient key={id} id={id} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={color} stopOpacity={0.5} />
+                    <stop offset="100%" stopColor={color} stopOpacity={0.05} />
+                  </linearGradient>
+                ))}
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(217 32% 17%)" />
               <XAxis
@@ -334,10 +328,12 @@ const IpActivityChart = ({ events }: Props) => {
                 labelStyle={{ color: "hsl(var(--muted-foreground))" }}
               />
               <Legend wrapperStyle={{ fontSize: 10 }} />
-              <Area type="monotone" dataKey="Bans" stackId="1" stroke="hsl(0 84% 60%)" fill="url(#g-act-bans)" strokeWidth={1.5} />
+              <Area type="monotone" dataKey="Brute Force" stackId="1" stroke="hsl(0 84% 60%)" fill="url(#g-act-brute)" strokeWidth={1.5} />
               <Area type="monotone" dataKey="Auth Failures" stackId="1" stroke="hsl(38 92% 50%)" fill="url(#g-act-auth)" strokeWidth={1.5} />
-              <Area type="monotone" dataKey="CrowdSec" stackId="1" stroke="hsl(217 91% 60%)" fill="url(#g-act-crowd)" strokeWidth={1.5} />
-              <Area type="monotone" dataKey="Andere" stackId="1" stroke="hsl(25 95% 53%)" fill="url(#g-act-other)" strokeWidth={1.5} />
+              <Area type="monotone" dataKey="Port Scan" stackId="1" stroke="hsl(217 91% 60%)" fill="url(#g-act-port)" strokeWidth={1.5} />
+              <Area type="monotone" dataKey="Bans" stackId="1" stroke="hsl(290 70% 55%)" fill="url(#g-act-ban)" strokeWidth={1.5} />
+              <Area type="monotone" dataKey="Unbans" stackId="1" stroke="hsl(142 71% 45%)" fill="url(#g-act-unban)" strokeWidth={1.5} />
+              <Area type="monotone" dataKey="Crawl/Probe" stackId="1" stroke="hsl(180 60% 45%)" fill="url(#g-act-crawl)" strokeWidth={1.5} />
             </AreaChart>
           </ResponsiveContainer>
         )}
