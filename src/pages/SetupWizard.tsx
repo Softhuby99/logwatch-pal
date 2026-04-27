@@ -34,6 +34,7 @@ interface WizardState {
   enableHttps: boolean;
   certPath: string;
   // Authentik / SSO
+  installAuthentik: boolean;
   authentikUrl: string;
   authentikRealm: string;
   oidcClientId: string;
@@ -57,6 +58,7 @@ const DEFAULT_STATE: WizardState = {
   serverIp: "0.0.0.0",
   enableHttps: true,
   certPath: "./certs",
+  installAuthentik: true,
   authentikUrl: "https://auth.dashboard.local",
   authentikRealm: "dashboard",
   oidcClientId: "dashboard",
@@ -98,6 +100,9 @@ ENABLE_HTTPS=${s.enableHttps}
 CERT_PATH=${s.certPath}
 
 # --- SSO / Authentik ---
+# INSTALL_AUTHENTIK=true: Authentik wird im Compose mit-installiert.
+# false: bestehende Authentik-Instanz unter AUTHENTIK_URL wird genutzt.
+INSTALL_AUTHENTIK=${s.installAuthentik}
 AUTHENTIK_URL=${s.authentikUrl}
 AUTHENTIK_REALM=${s.authentikRealm}
 OIDC_CLIENT_ID=${s.oidcClientId}
