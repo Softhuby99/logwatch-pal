@@ -1,16 +1,23 @@
 import { useMemo, useState } from "react";
-import { Ban, ShieldOff, Clock, Activity } from "lucide-react";
+import { Ban, ShieldOff, Clock, KeyRound, AlertTriangle, Eye } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { format, formatDistanceStrict } from "date-fns";
-import { de } from "date-fns/locale";
-import type { BanInterval } from "@/lib/ipTimeline";
+import { format } from "date-fns";
+import type { BanInterval, IpTimelineEvent, TimelineEventKind } from "@/lib/ipTimeline";
 
 interface Props {
   intervals: BanInterval[];
   /** Compact = innerhalb Sheet, false = volle Höhe */
   compact?: boolean;
+  /** Optional: Angriffs-Events, die als Marker unter der Ban-Achse gezeigt werden */
+  events?: IpTimelineEvent[];
 }
+
+const ATTACK_KIND_META: Partial<Record<TimelineEventKind, { label: string; color: string; ring: string; icon: typeof KeyRound }>> = {
+  auth_failure: { label: "Auth Failure", color: "bg-amber-500", ring: "ring-amber-400/40", icon: KeyRound },
+  crowdsec: { label: "CrowdSec", color: "bg-blue-500", ring: "ring-blue-400/40", icon: Eye },
+  security_event: { label: "Security Event", color: "bg-orange-500", ring: "ring-orange-400/40", icon: AlertTriangle },
+};
 
 const fmtFull = (iso: string) => {
   try {
