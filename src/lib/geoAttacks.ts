@@ -97,6 +97,13 @@ export const iso3ToIso2 = (iso3: string): string | null => {
 // Country Aggregation
 // ============================================================
 
+export interface RegionAttackStat {
+  region: string;
+  unique_ips: number;
+  total_events: number;
+  bans: number;
+}
+
 export interface CountryAttackStat {
   iso2: string;
   iso3: string | null;
@@ -110,7 +117,65 @@ export interface CountryAttackStat {
   max_risk_score: number;
   /** Basis für Choropleth-Färbung (gewichtete Summe) */
   attack_weight: number;
+  /** Aufschlüsselung pro Region (für Bubble-Marker auf der Karte) */
+  regions: RegionAttackStat[];
 }
+
+// ----- Mock-Region per IP (deterministisch) -----
+// Für die Demo gibt es keine echten Region-Daten in mockIPEnrichment.
+// Wir leiten pro Land aus einer kurzen Region-Liste deterministisch über
+// einen Hash der IP eine Region ab. Das produziert stabile, plausible Daten
+// (gleiche IP → gleiche Region) – die echte FastAPI ersetzt das später durch
+// die `region`-Spalte aus der ip_enrichment Tabelle.
+const REGIONS_BY_COUNTRY: Record<string, string[]> = {
+  RU: ["Moskau", "St. Petersburg", "Nowosibirsk", "Jekaterinburg"],
+  UA: ["Kyiv", "Charkiw", "Odessa", "Lwiw"],
+  BD: ["Dhaka", "Chittagong", "Khulna"],
+  NL: ["Nordholland", "Südholland", "Utrecht"],
+  GB: ["London", "Manchester", "Edinburgh"],
+  EE: ["Harju", "Tartu"],
+  US: ["California", "Virginia", "Texas", "New York", "Oregon"],
+  DE: ["Berlin", "Bayern", "Hessen", "Nordrhein-Westfalen"],
+  CN: ["Peking", "Shanghai", "Guangdong", "Zhejiang"],
+  IN: ["Maharashtra", "Karnataka", "Delhi", "Tamil Nadu"],
+  BR: ["São Paulo", "Rio de Janeiro", "Minas Gerais"],
+  FR: ["Île-de-France", "Provence", "Auvergne-Rhône-Alpes"],
+  IT: ["Lombardei", "Latium", "Kampanien"],
+  ES: ["Madrid", "Katalonien", "Andalusien"],
+  PL: ["Masowien", "Schlesien", "Pommern"],
+  TR: ["Istanbul", "Ankara", "Izmir"],
+  IR: ["Teheran", "Isfahan", "Maschhad"],
+  KP: ["Pjöngjang"],
+  KR: ["Seoul", "Busan"],
+  JP: ["Tokio", "Osaka"],
+  VN: ["Hanoi", "Ho-Chi-Minh-Stadt"],
+  ID: ["Jakarta", "Java"],
+  PK: ["Punjab", "Sindh"],
+  RO: ["București", "Cluj"],
+  BG: ["Sofia"],
+  CZ: ["Prag"],
+  CH: ["Zürich", "Genf"],
+  AT: ["Wien", "Steiermark"],
+  SE: ["Stockholm"],
+  CA: ["Ontario", "Quebec"],
+  HK: ["Hongkong"],
+  SG: ["Singapur"],
+  AE: ["Dubai", "Abu Dhabi"],
+  ZA: ["Gauteng", "Westkap"],
+  MX: ["CDMX", "Jalisco"],
+  AR: ["Buenos Aires"],
+};
+
+const hashString = (s: string) => {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+};
+
+export const regionForIp = (iso2: string, ip: string): string => {
+  const list = REGIONS_BY_COUNTRY[iso2.toUpperCase()] ?? ["Unbekannt"];
+  return list[hashString(ip) % list.length];
+};
 
 const eventCountByIp = (): Map<string, { events: number; bans: number; authFails: number; crit: number; warn: number }> => {
   const map = new Map<
