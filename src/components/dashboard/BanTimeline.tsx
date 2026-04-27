@@ -143,6 +143,15 @@ const BanTimeline = ({ intervals, compact = false, events = [] }: Props) => {
             <span className="w-2 h-2 rounded-full bg-emerald-500" />
             Unban
           </span>
+          {Object.entries(ATTACK_KIND_META).map(([kind, meta]) =>
+            meta && attackCounts[kind as TimelineEventKind] ? (
+              <span key={kind} className="flex items-center gap-1">
+                <span className={`w-2 h-2 rounded-full ${meta.color}`} />
+                {meta.label}
+                <span className="text-foreground/70">({attackCounts[kind as TimelineEventKind]})</span>
+              </span>
+            ) : null
+          )}
         </div>
       </div>
 
