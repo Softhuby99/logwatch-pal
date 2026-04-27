@@ -45,13 +45,13 @@ function buildUserManager() {
 }
 
 function toSession(u: User): OidcUser {
-  const profile = u.profile ?? {};
-  return {
-    kind: "oidc",
-    email: (profile.email as string) ?? "",
-    name: (profile.name as string) ?? (profile.preferred_username as string) ?? "Unknown",
-    raw: u,
-  };
+  const profile = (u.profile ?? {}) as Record<string, unknown>;
+  const email = typeof profile.email === "string" ? profile.email : "";
+  const name =
+    (typeof profile.name === "string" && profile.name) ||
+    (typeof profile.preferred_username === "string" && profile.preferred_username) ||
+    "Unknown";
+  return { kind: "oidc", email, name, raw: u };
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
