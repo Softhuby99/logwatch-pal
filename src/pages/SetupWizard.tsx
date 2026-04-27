@@ -30,6 +30,7 @@ interface WizardState {
   backupCron: string;
   // Web
   hostname: string;
+  serverIp: string;
   enableHttps: boolean;
   certPath: string;
   // Authentik / SSO
@@ -53,6 +54,7 @@ const DEFAULT_STATE: WizardState = {
   backupPath: "/var/backups/dashboard",
   backupCron: "0 3 * * *",
   hostname: "dashboard.local",
+  serverIp: "0.0.0.0",
   enableHttps: true,
   certPath: "./certs",
   authentikUrl: "https://auth.dashboard.local",
