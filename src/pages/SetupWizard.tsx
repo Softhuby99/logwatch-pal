@@ -30,6 +30,7 @@ interface WizardState {
   backupCron: string;
   // Web
   hostname: string;
+  serverIp: string;
   enableHttps: boolean;
   certPath: string;
   // Authentik / SSO
@@ -53,6 +54,7 @@ const DEFAULT_STATE: WizardState = {
   backupPath: "/var/backups/dashboard",
   backupCron: "0 3 * * *",
   hostname: "dashboard.local",
+  serverIp: "0.0.0.0",
   enableHttps: true,
   certPath: "./certs",
   authentikUrl: "https://auth.dashboard.local",
@@ -90,6 +92,7 @@ BACKUP_PATH=${s.backupPath}
 BACKUP_CRON=${s.backupCron}
 
 # --- Web ---
+SERVER_IP=${s.serverIp}
 HOSTNAME=${s.hostname}
 ENABLE_HTTPS=${s.enableHttps}
 CERT_PATH=${s.certPath}
@@ -214,6 +217,7 @@ export default function SetupWizard() {
 
         {Current.id === "web" && (
           <div className="grid gap-4 md:grid-cols-2">
+            <Field label="Server IP-Adresse" value={state.serverIp} onChange={(v) => update("serverIp", v)} hint="IP, an die der Reverse-Proxy bindet. 0.0.0.0 = alle Interfaces. install.sh erkennt vorhandene IPs automatisch." />
             <Field label="Hostname" value={state.hostname} onChange={(v) => update("hostname", v)} hint="z.B. dashboard.example.com" />
             <Toggle label="HTTPS aktivieren" checked={state.enableHttps} onChange={(v) => update("enableHttps", v)} hint="HTTP bleibt parallel auf Port 80 verfügbar" />
             <Field label="Zertifikats-Verzeichnis" value={state.certPath} onChange={(v) => update("certPath", v)} hint="Lege hier deine Let's-Encrypt fullchain.pem + privkey.pem ab" />
