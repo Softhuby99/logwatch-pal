@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { mockIPSummary } from "@/data/mockSecurityData";
+import { useIpDetail } from "@/contexts/IpDetailContext";
 
 const statusColor = (s: string) => {
   if (s === "banned") return "destructive";
@@ -9,6 +10,7 @@ const statusColor = (s: string) => {
 };
 
 const TopAttackers = () => {
+  const { openIp } = useIpDetail();
   const sorted = [...mockIPSummary].sort((a, b) => b.total_events - a.total_events);
 
   return (
@@ -32,8 +34,12 @@ const TopAttackers = () => {
           </TableHeader>
           <TableBody>
             {sorted.map((ip) => (
-              <TableRow key={ip.ip} className="border-border/20 font-mono text-xs">
-                <TableCell className="text-foreground font-medium">{ip.ip}</TableCell>
+              <TableRow
+                key={ip.ip}
+                className="border-border/20 font-mono text-xs cursor-pointer hover:bg-muted/30"
+                onClick={() => openIp(ip.ip)}
+              >
+                <TableCell className="text-primary hover:underline font-medium">{ip.ip}</TableCell>
                 <TableCell className="text-center">{ip.total_events}</TableCell>
                 <TableCell className="text-center text-red-400">{ip.total_bans}</TableCell>
                 <TableCell className="text-center text-amber-400">{ip.total_auth_failures}</TableCell>
