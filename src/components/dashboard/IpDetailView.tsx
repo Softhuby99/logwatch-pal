@@ -157,22 +157,7 @@ const IpDetailView = ({ ip, embedded = false }: Props) => {
               {stats.last_seen && <div>last: <span className="text-foreground/80">{fmt(stats.last_seen)}</span></div>}
             </div>
           </div>
-          {embedded && (
-            <button
-              type="button"
-              onClick={() => {
-                const url = `/ip/${encodeURIComponent(ip)}`;
-                const win = window.open(url, "_blank", "noopener");
-                // Bring the new tab/window to the foreground
-                if (win) {
-                  try { win.focus(); } catch { /* noop */ }
-                }
-              }}
-              className="text-xs text-primary hover:underline flex items-center gap-1 whitespace-nowrap"
-            >
-              <ExternalLink className="h-3 w-3" /> Volle Ansicht
-            </button>
-          )}
+          {embedded && <FullViewLink ip={ip} />}
         </div>
       </div>
 
