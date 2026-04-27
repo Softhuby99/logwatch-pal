@@ -158,12 +158,20 @@ const IpDetailView = ({ ip, embedded = false }: Props) => {
             </div>
           </div>
           {embedded && (
-            <Link
-              to={`/ip/${encodeURIComponent(ip)}`}
+            <button
+              type="button"
+              onClick={() => {
+                const url = `/ip/${encodeURIComponent(ip)}`;
+                const win = window.open(url, "_blank", "noopener");
+                // Bring the new tab/window to the foreground
+                if (win) {
+                  try { win.focus(); } catch { /* noop */ }
+                }
+              }}
               className="text-xs text-primary hover:underline flex items-center gap-1 whitespace-nowrap"
             >
               <ExternalLink className="h-3 w-3" /> Volle Ansicht
-            </Link>
+            </button>
           )}
         </div>
       </div>
