@@ -150,7 +150,7 @@ services:
       HOSTNAME: ${HOSTNAME}
     volumes:
       - ./nginx/templates:/etc/nginx/templates:ro
-      - ${CERT_PATH}:/etc/nginx/certs:ro
+      - ${CERT_PATH:-./certs}:/etc/nginx/certs:ro
     depends_on:
       - dashboard
       # authentik is optional (compose profile). proxy proxies to it if present.
