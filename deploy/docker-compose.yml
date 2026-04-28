@@ -41,6 +41,10 @@ services:
       - ./logs:/var/log/dashboard
 
   # ---------- Dashboard (React build via nginx) ----------
+  # When INSTALL_PROXY=false, the dashboard binds DASHBOARD_PORT directly on
+  # the host so an external reverse proxy (e.g. OPNsense Nginx) can target it.
+  # When INSTALL_PROXY=true (default), only the bundled `proxy` service exposes
+  # ports and the dashboard stays on the internal docker network.
   dashboard:
     build:
       context: ..
@@ -57,6 +61,7 @@ services:
         VITE_SSO_OIDC_ENABLED: ${VITE_SSO_OIDC_ENABLED}
         VITE_SSO_PASSWORD_ENABLED: ${VITE_SSO_PASSWORD_ENABLED}
     restart: unless-stopped
+    ports: !reset []
     depends_on:
       db:
         condition: service_healthy
