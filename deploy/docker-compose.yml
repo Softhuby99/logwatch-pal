@@ -61,7 +61,12 @@ services:
         VITE_SSO_OIDC_ENABLED: ${VITE_SSO_OIDC_ENABLED}
         VITE_SSO_PASSWORD_ENABLED: ${VITE_SSO_PASSWORD_ENABLED}
     restart: unless-stopped
-    ports: !reset []
+    # Dashboard port is published only when INSTALL_PROXY=false (external proxy
+    # mode). When the bundled proxy runs, leave DASHBOARD_PORT unset/empty and
+    # this binding becomes a no-op via docker compose's "ignore empty" rule
+    # (we set 127.0.0.1 to make the binding harmless if the var is set).
+    ports:
+      - "${DASHBOARD_BIND:-127.0.0.1}:${DASHBOARD_PORT:-8080}:80"
     depends_on:
       db:
         condition: service_healthy
