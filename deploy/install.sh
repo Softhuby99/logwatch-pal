@@ -93,10 +93,15 @@ https://download.docker.com/linux/debian $VERSION_CODENAME stable" \
 }
 
 ensure_users() {
-  # Log-Server system user (uid 1500 to match docker-compose)
+  # Log-Server system user. Defaults to logcollector/1001 (see .env.example).
+  local uid="${LOG_SRV_UID:-1001}"
+  local gid="${LOG_SRV_GID:-1001}"
   if ! id -u "${LOG_SRV_USER}" >/dev/null 2>&1; then
-    echo "[install] creating system user ${LOG_SRV_USER} (uid 1500)"
-    useradd -r -u 1500 -s /usr/sbin/nologin -d /var/empty "${LOG_SRV_USER}" || true
+    echo "[install] creating system user ${LOG_SRV_USER} (uid ${uid})"
+    groupadd -r -g "${gid}" "${LOG_SRV_USER}" 2>/dev/null || true
+    useradd -r -u "${uid}" -g "${gid}" -s /usr/sbin/nologin -d /var/empty "${LOG_SRV_USER}" || true
+  else
+    echo "[install] reusing existing user ${LOG_SRV_USER} (uid $(id -u "${LOG_SRV_USER}"))"
   fi
 
   # Note: DB_USER lives only inside the postgres container, no host user needed.
