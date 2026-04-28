@@ -122,10 +122,14 @@ sonst übernimmt:
 
 ```bash
 # als root auf dem LogSrv
-sudo useradd -r -u 1500 -s /usr/sbin/nologin -d /var/empty logsrv || true
+# Vorhandenen User wiederverwenden (z. B. logcollector, uid 1001) – oder neu anlegen:
+sudo id logcollector || sudo useradd -r -u 1001 -s /usr/sbin/nologin -d /var/empty logcollector
 sudo mkdir -p /opt/dashboard/{logs,backups,authentik/blueprints}
-sudo chown -R 1500:1500 /opt/dashboard/logs
+sudo chown -R 1001:1001 /opt/dashboard/logs
 ```
+
+> Passe `LOG_SRV_USER`, `LOG_SRV_UID`, `LOG_SRV_GID` in der `.env` an, falls
+> dein User eine andere UID/GID hat.
 
 Wenn du **Bind-Mounts** statt der relativen Pfade willst, passe in der
 compose-Datei die Volumes an (`./logs` → `/opt/dashboard/logs` usw.) –
