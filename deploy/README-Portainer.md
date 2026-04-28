@@ -8,21 +8,32 @@ Diese Anleitung beschreibt, wie du den Dashboard-Stack komplett über
 ## Voraussetzungen
 
 - Portainer CE läuft auf dem LogSrv (Docker)
-- Du erreichst Portainer im Browser (z. B. `http://logsrv:9000`)
+- Du erreichst Portainer im Browser über **HTTPS**: `https://logsrv:9443`
+  (HTTP-only ist deaktiviert – Portainer redirected/verweigert Port 9000)
+- Edge-Agent-Tunnel auf **8000/tcp**
 - Das Repo `Softhuby99/logwatch-pal` ist auf GitHub verfügbar
 
 ---
 
-## ⚠️ Port-Konflikt beachten
+## ✅ Belegte Ports auf dem LogSrv
 
-Portainer belegt standardmäßig **9000/9443**. Der Default für Authentik ist
-ebenfalls **9000**. Lösungen:
+| Port | Dienst | Quelle |
+|------|--------|--------|
+| 9443/tcp | Portainer UI (HTTPS) | Portainer-Container |
+| 8000/tcp | Portainer Edge Agent | Portainer-Container |
+| 8080/tcp | Dashboard (Default) | dieser Stack, `DASHBOARD_PORT` |
+| 80, 443/tcp | Bundled Proxy (nur falls `INSTALL_PROXY=true`) | dieser Stack |
+| 9000/tcp | Authentik (nur falls `INSTALL_AUTHENTIK=true`) | dieser Stack |
 
-| Szenario | Maßnahme |
-|----------|----------|
-| **Externes Authentik** (`INSTALL_AUTHENTIK=false`) | ✅ Nichts zu tun – Port wird nicht gebunden |
-| **Gebündeltes Authentik** | In `.env`: `AUTHENTIK_PORT=9100` |
-| **Gebündelter Proxy** (`INSTALL_PROXY=true`) | Bindet 80/443 – kein Konflikt mit Portainer |
+➡️ **Kein Konflikt** zwischen Portainer (9443/8000) und dem Dashboard-Stack
+(8080 + optional 80/443/9000). Du kannst die Defaults so lassen.
+
+Wenn du den Default-Port des Dashboards ändern willst (z. B. weil 8080 schon
+anderweitig belegt ist), setze in der `.env`:
+
+```
+DASHBOARD_PORT=8081
+```
 
 ---
 
