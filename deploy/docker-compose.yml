@@ -105,6 +105,10 @@ services:
     restart: unless-stopped
     command: server
     environment: *authentik-env
+    # Published only when INSTALL_PROXY=false; default bind 127.0.0.1 keeps
+    # this safe when the bundled proxy is in front.
+    ports:
+      - "${AUTHENTIK_BIND:-127.0.0.1}:${AUTHENTIK_PORT:-9000}:9000"
     volumes:
       - ./authentik/blueprints:/blueprints/custom:ro
       - authentik-media:/media
