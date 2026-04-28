@@ -41,6 +41,10 @@ services:
       - ./logs:/var/log/dashboard
 
   # ---------- Dashboard (React build via nginx) ----------
+  # When INSTALL_PROXY=false, the dashboard binds DASHBOARD_PORT directly on
+  # the host so an external reverse proxy (e.g. OPNsense Nginx) can target it.
+  # When INSTALL_PROXY=true (default), only the bundled `proxy` service exposes
+  # ports and the dashboard stays on the internal docker network.
   dashboard:
     build:
       context: ..
@@ -57,6 +61,12 @@ services:
         VITE_SSO_OIDC_ENABLED: ${VITE_SSO_OIDC_ENABLED}
         VITE_SSO_PASSWORD_ENABLED: ${VITE_SSO_PASSWORD_ENABLED}
     restart: unless-stopped
+    # Dashboard port is published only when INSTALL_PROXY=false (external proxy
+    # mode). When the bundled proxy runs, leave DASHBOARD_PORT unset/empty and
+    # this binding becomes a no-op via docker compose's "ignore empty" rule
+    # (we set 127.0.0.1 to make the binding harmless if the var is set).
+    ports:
+      - "${DASHBOARD_BIND:-127.0.0.1}:${DASHBOARD_PORT:-8080}:80"
     depends_on:
       db:
         condition: service_healthy
@@ -95,6 +105,10 @@ services:
     restart: unless-stopped
     command: server
     environment: *authentik-env
+    # Published only when INSTALL_PROXY=false; default bind 127.0.0.1 keeps
+    # this safe when the bundled proxy is in front.
+    ports:
+      - "${AUTHENTIK_BIND:-127.0.0.1}:${AUTHENTIK_PORT:-9000}:9000"
     volumes:
       - ./authentik/blueprints:/blueprints/custom:ro
       - authentik-media:/media
@@ -121,9 +135,13 @@ services:
       authentik-redis:
         condition: service_started
 
-  # ---------- Reverse proxy ----------
+  # ---------- Reverse proxy (bundled, optional) ----------
+  # Only started when INSTALL_PROXY=true (compose profile "proxy").
+  # Disable by setting INSTALL_PROXY=false in .env to use an external reverse
+  # proxy (e.g. OPNsense Nginx, Traefik, Caddy on another host).
   proxy:
     image: nginx:1.27-alpine
+    profiles: ["proxy"]
     restart: unless-stopped
     ports:
       - "${SERVER_IP:-0.0.0.0}:80:80"
@@ -132,7 +150,7 @@ services:
       HOSTNAME: ${HOSTNAME}
     volumes:
       - ./nginx/templates:/etc/nginx/templates:ro
-      - ${CERT_PATH}:/etc/nginx/certs:ro
+      - ${CERT_PATH:-./certs}:/etc/nginx/certs:ro
     depends_on:
       - dashboard
       # authentik is optional (compose profile). proxy proxies to it if present.

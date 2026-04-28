@@ -104,10 +104,15 @@ ensure_users() {
 }
 
 ensure_dirs() {
-  mkdir -p ./certs ./logs ./authentik/blueprints "${BACKUP_PATH}"
+  mkdir -p ./logs ./authentik/blueprints "${BACKUP_PATH}"
   chown -R 1500:1500 ./logs || true
-  chmod 700 ./certs
-  echo "[install] cert dir is $(realpath ./certs) – place fullchain.pem + privkey.pem there"
+  if [ "${INSTALL_PROXY:-true}" = "true" ]; then
+    mkdir -p ./certs
+    chmod 700 ./certs
+    echo "[install] cert dir is $(realpath ./certs) – place fullchain.pem + privkey.pem there"
+  else
+    echo "[install] external proxy mode – TLS certs handled outside this stack"
+  fi
 }
 
 ensure_host_cron() {
@@ -124,15 +129,33 @@ ensure_host_cron() {
 bring_up() {
   chmod +x backup/backup.sh backup/entrypoint.sh
   echo "[install] building & starting stack..."
-  # Activate the "authentik" compose profile only when INSTALL_AUTHENTIK=true.
-  # Otherwise the dashboard talks to the existing Authentik instance under AUTHENTIK_URL.
+
+  # Compose profiles control optional services:
+  #   - "authentik" -> bundled SSO stack
+  #   - "proxy"     -> bundled nginx reverse proxy on :80/:443
+  PROFILES=()
   if [ "${INSTALL_AUTHENTIK:-true}" = "true" ]; then
-    export COMPOSE_PROFILES=authentik
-    echo "[install] mode: bundled Authentik (profile=authentik)"
+    PROFILES+=("authentik")
+    echo "[install] mode: bundled Authentik"
   else
-    unset COMPOSE_PROFILES
     echo "[install] mode: external Authentik at ${AUTHENTIK_URL}"
   fi
+  if [ "${INSTALL_PROXY:-true}" = "true" ]; then
+    PROFILES+=("proxy")
+    echo "[install] mode: bundled nginx proxy on ${SERVER_IP}:80/:443"
+  else
+    echo "[install] mode: EXTERNAL reverse proxy"
+    echo "          dashboard -> ${DASHBOARD_BIND:-127.0.0.1}:${DASHBOARD_PORT:-8080}"
+    if [ "${INSTALL_AUTHENTIK:-true}" = "true" ]; then
+      echo "          authentik -> ${AUTHENTIK_BIND:-127.0.0.1}:${AUTHENTIK_PORT:-9000}"
+    fi
+  fi
+  if [ ${#PROFILES[@]} -gt 0 ]; then
+    export COMPOSE_PROFILES="$(IFS=,; echo "${PROFILES[*]}")"
+  else
+    unset COMPOSE_PROFILES
+  fi
+
   docker compose pull
   docker compose build dashboard
   docker compose up -d
