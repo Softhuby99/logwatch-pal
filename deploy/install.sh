@@ -110,7 +110,7 @@ ensure_users() {
 
 ensure_dirs() {
   mkdir -p ./logs ./authentik/blueprints "${BACKUP_PATH}"
-  chown -R 1500:1500 ./logs || true
+  chown -R "${LOG_SRV_UID:-1001}:${LOG_SRV_GID:-1001}" ./logs || true
   if [ "${INSTALL_PROXY:-true}" = "true" ]; then
     mkdir -p ./certs
     chmod 700 ./certs
