@@ -135,9 +135,13 @@ services:
       authentik-redis:
         condition: service_started
 
-  # ---------- Reverse proxy ----------
+  # ---------- Reverse proxy (bundled, optional) ----------
+  # Only started when INSTALL_PROXY=true (compose profile "proxy").
+  # Disable by setting INSTALL_PROXY=false in .env to use an external reverse
+  # proxy (e.g. OPNsense Nginx, Traefik, Caddy on another host).
   proxy:
     image: nginx:1.27-alpine
+    profiles: ["proxy"]
     restart: unless-stopped
     ports:
       - "${SERVER_IP:-0.0.0.0}:80:80"
