@@ -104,10 +104,15 @@ ensure_users() {
 }
 
 ensure_dirs() {
-  mkdir -p ./certs ./logs ./authentik/blueprints "${BACKUP_PATH}"
+  mkdir -p ./logs ./authentik/blueprints "${BACKUP_PATH}"
   chown -R 1500:1500 ./logs || true
-  chmod 700 ./certs
-  echo "[install] cert dir is $(realpath ./certs) – place fullchain.pem + privkey.pem there"
+  if [ "${INSTALL_PROXY:-true}" = "true" ]; then
+    mkdir -p ./certs
+    chmod 700 ./certs
+    echo "[install] cert dir is $(realpath ./certs) – place fullchain.pem + privkey.pem there"
+  else
+    echo "[install] external proxy mode – TLS certs handled outside this stack"
+  fi
 }
 
 ensure_host_cron() {
