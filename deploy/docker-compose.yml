@@ -31,11 +31,11 @@ services:
 
   # ---------- Log server placeholder ----------
   # Replace `image:` with your actual log collector. Mounts ./logs as volume
-  # and runs as the configured LOG_SRV_USER (uid 1500 by default in install.sh).
+  # and runs as LOG_SRV_UID:LOG_SRV_GID (defaults: 1001:1001 = `logcollector`).
   logsrv:
     image: alpine:3.20
     restart: unless-stopped
-    user: "1500:1500"
+    user: "${LOG_SRV_UID:-1001}:${LOG_SRV_GID:-1001}"
     command: ["sh", "-c", "echo 'Replace this service with your log collector'; tail -f /dev/null"]
     volumes:
       - ./logs:/var/log/dashboard
