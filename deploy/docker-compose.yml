@@ -147,6 +147,7 @@ services:
       - "${SERVER_IP:-0.0.0.0}:80:80"
       - "${SERVER_IP:-0.0.0.0}:443:443"
     environment:
+      AUTHENTIK_PROXY_PASS: ${AUTHENTIK_PROXY_PASS:-http://authentik:9000/}
       HOSTNAME: ${HOSTNAME}
     volumes:
       - ./nginx/templates:/etc/nginx/templates:ro

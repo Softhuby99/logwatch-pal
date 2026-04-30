@@ -6,9 +6,9 @@ server {
   listen 80;
   server_name ${HOSTNAME};
 
-  # Authentik served under /auth/
+  # Auth served under /auth/
   location /auth/ {
-    proxy_pass http://authentik:9000/;
+    proxy_pass ${AUTHENTIK_PROXY_PASS};
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -36,7 +36,7 @@ server {
   ssl_prefer_server_ciphers on;
 
   location /auth/ {
-    proxy_pass http://authentik:9000/;
+    proxy_pass ${AUTHENTIK_PROXY_PASS};
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
