@@ -78,7 +78,7 @@ const AggressiveIPs30Days = () => {
       : "-";
 
   const filtered = useMemo(() => {
-    return mockAggressiveIPs30Days.filter((row) => {
+    return sourceData.filter((row) => {
       const vals: Record<string, string> = {
         ip: row.ip,
         total_events: String(row.total_events),
