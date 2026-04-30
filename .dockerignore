@@ -1,0 +1,12 @@
+node_modules
+dist
+.git
+.env
+.env.*
+deploy/certs
+deploy/backups
+deploy/logs
+deploy/backup/data
+**/*.log
+.vscode
+.idea
