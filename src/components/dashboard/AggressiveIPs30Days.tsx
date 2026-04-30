@@ -43,6 +43,12 @@ type SortKey =
 
 const AggressiveIPs30Days = () => {
   const { openIp } = useIpDetail();
+  const { data: apiData } = useApiData(
+    () => fetchAggressiveIps30d(mockAggressiveIPs30Days),
+    [],
+    30_000
+  );
+  const sourceData = apiData ?? mockAggressiveIPs30Days;
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [openFilter, setOpenFilter] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("risk_score");
