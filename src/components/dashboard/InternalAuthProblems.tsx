@@ -4,6 +4,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { mockInternalAuthProblems } from "@/data/mockSecurityData";
 import { format } from "date-fns";
 import { ChevronDown, ChevronUp, Filter, Info } from "lucide-react";
+import { useApiData } from "@/hooks/useApiData";
+import { fetchInternalAuthProblems } from "@/lib/api";
 
 type SortDir = "asc" | "desc" | null;
 type SortKey = "ip" | "failed_logins" | "username" | "login_type" | "last_seen" | "organisation" | "land" | "ptr" | "ziel_port";
