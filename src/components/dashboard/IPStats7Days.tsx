@@ -31,6 +31,12 @@ type SortKey = "ip" | "total_events" | "first_seen" | "last_seen" | "last_target
 
 const IPStats7Days = () => {
   const { openIp } = useIpDetail();
+  const { data: apiData } = useApiData(
+    () => fetchIpStats7d<IpSummary>(mockIPSummary),
+    [],
+    30_000
+  );
+  const sourceData = apiData ?? mockIPSummary;
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [openFilter, setOpenFilter] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("total_events");
