@@ -41,7 +41,7 @@ const InternalAuthProblems = () => {
   };
 
   const filtered = useMemo(() => {
-    return mockInternalAuthProblems.filter((row) => {
+    return sourceData.filter((row) => {
       const vals: Record<string, string> = {
         ip: row.ip, failed_logins: String(row.failed_logins), username: row.username,
         login_type: row.login_type, last_seen: formatTime(row.last_seen),
