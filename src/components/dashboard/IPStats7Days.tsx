@@ -6,6 +6,9 @@ import { mockIPSummary } from "@/data/mockSecurityData";
 import { format } from "date-fns";
 import { ChevronDown, ChevronUp, Filter, Info } from "lucide-react";
 import { useIpDetail } from "@/contexts/IpDetailContext";
+import { useApiData } from "@/hooks/useApiData";
+import { fetchIpStats7d } from "@/lib/api";
+import type { IpSummary } from "@/types/database";
 
 const eventTypeColor = (type: string): string => {
   const t = type.toLowerCase();
