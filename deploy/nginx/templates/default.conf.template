@@ -1,30 +1,17 @@
 # Front-facing reverse proxy (HTTP + HTTPS).
 # `${HOSTNAME}` is substituted by the nginx env-template module.
 
-# ---------- HTTP ----------
+# Use Docker's internal DNS so missing upstreams don't crash nginx
+resolver 127.0.0.11 valid=30s ipv6=off;
+
+# ---------- HTTP → HTTPS redirect ----------
 server {
   listen 80;
   server_name ${HOSTNAME};
-
-  # Auth served under /auth/
-  location /auth/ {
-    proxy_pass ${AUTHENTIK_PROXY_PASS};
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-  }
-
-  # Dashboard SPA
-  location / {
-    proxy_pass http://dashboard:80;
-    proxy_set_header Host $host;
-    proxy_set_header X-Forwarded-Proto $scheme;
-  }
+  return 301 https://$host$request_uri;
 }
 
 # ---------- HTTPS ----------
-# Only active when fullchain.pem + privkey.pem exist in /etc/nginx/certs/
 server {
   listen 443 ssl;
   http2 on;
@@ -35,14 +22,17 @@ server {
   ssl_protocols TLSv1.2 TLSv1.3;
   ssl_prefer_server_ciphers on;
 
+  # Auth – uses a variable so nginx starts even if authentik is down
   location /auth/ {
-    proxy_pass ${AUTHENTIK_PROXY_PASS};
+    set $authentik_upstream ${AUTHENTIK_PROXY_PASS};
+    proxy_pass $authentik_upstream;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto https;
   }
 
+  # Dashboard SPA
   location / {
     proxy_pass http://dashboard:80;
     proxy_set_header Host $host;
