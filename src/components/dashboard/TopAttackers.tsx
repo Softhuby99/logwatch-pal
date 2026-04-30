@@ -3,6 +3,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { mockIPSummary } from "@/data/mockSecurityData";
 import { useIpDetail } from "@/contexts/IpDetailContext";
+import { useApiData } from "@/hooks/useApiData";
+import { fetchTopAttackers } from "@/lib/api";
+import type { IpSummary } from "@/types/database";
 
 const statusColor = (s: string) => {
   if (s === "banned") return "destructive";
@@ -11,7 +14,12 @@ const statusColor = (s: string) => {
 
 const TopAttackers = () => {
   const { openIp } = useIpDetail();
-  const sorted = [...mockIPSummary].sort((a, b) => b.total_events - a.total_events);
+  const { data: apiData } = useApiData(
+    () => fetchTopAttackers<IpSummary>("24h", mockIPSummary),
+    [],
+    30_000
+  );
+  const sorted = [...(apiData ?? mockIPSummary)].sort((a, b) => (b.total_events ?? 0) - (a.total_events ?? 0));
 
   return (
     <Card className="border-border/50 bg-card/80 backdrop-blur">
@@ -33,7 +41,7 @@ const TopAttackers = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sorted.map((ip) => (
+            {sorted.map((ip: any) => (
               <TableRow
                 key={ip.ip}
                 className="border-border/20 font-mono text-xs cursor-pointer hover:bg-muted/30"
@@ -41,14 +49,14 @@ const TopAttackers = () => {
               >
                 <TableCell className="text-primary hover:underline font-medium">{ip.ip}</TableCell>
                 <TableCell className="text-center">{ip.total_events}</TableCell>
-                <TableCell className="text-center text-red-400">{ip.total_bans}</TableCell>
-                <TableCell className="text-center text-amber-400">{ip.total_auth_failures}</TableCell>
+                <TableCell className="text-center text-red-400">{ip.total_bans ?? ip.bans ?? 0}</TableCell>
+                <TableCell className="text-center text-amber-400">{ip.total_auth_failures ?? ip.auth_failures ?? 0}</TableCell>
                 <TableCell className="text-center text-muted-foreground">
                   {ip.last_destination_port ? `${ip.last_destination_port}/${ip.last_destination_service}` : "–"}
                 </TableCell>
                 <TableCell className="text-right">
-                  <Badge variant={statusColor(ip.current_status)} className="text-[10px] px-1.5">
-                    {ip.current_status}
+                  <Badge variant={statusColor(ip.current_status ?? "active")} className="text-[10px] px-1.5">
+                    {ip.current_status ?? "active"}
                   </Badge>
                 </TableCell>
               </TableRow>

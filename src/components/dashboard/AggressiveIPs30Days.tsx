@@ -7,6 +7,8 @@ import { format } from "date-fns";
 import { ChevronDown, ChevronUp, Filter, Info } from "lucide-react";
 import type { AlertLevel, RiskLevel } from "@/types/database";
 import { useIpDetail } from "@/contexts/IpDetailContext";
+import { useApiData } from "@/hooks/useApiData";
+import { fetchAggressiveIps30d } from "@/lib/api";
 
 const levelClass = (level: AlertLevel | null): string => {
   if (level === "CRIT") return "bg-red-500/20 text-red-400 border-red-500/30";
@@ -41,6 +43,12 @@ type SortKey =
 
 const AggressiveIPs30Days = () => {
   const { openIp } = useIpDetail();
+  const { data: apiData } = useApiData(
+    () => fetchAggressiveIps30d(mockAggressiveIPs30Days),
+    [],
+    30_000
+  );
+  const sourceData = apiData ?? mockAggressiveIPs30Days;
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [openFilter, setOpenFilter] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("risk_score");
@@ -70,7 +78,7 @@ const AggressiveIPs30Days = () => {
       : "-";
 
   const filtered = useMemo(() => {
-    return mockAggressiveIPs30Days.filter((row) => {
+    return sourceData.filter((row) => {
       const vals: Record<string, string> = {
         ip: row.ip,
         total_events: String(row.total_events),

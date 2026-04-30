@@ -4,11 +4,19 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { mockInternalAuthProblems } from "@/data/mockSecurityData";
 import { format } from "date-fns";
 import { ChevronDown, ChevronUp, Filter, Info } from "lucide-react";
+import { useApiData } from "@/hooks/useApiData";
+import { fetchInternalAuthProblems } from "@/lib/api";
 
 type SortDir = "asc" | "desc" | null;
 type SortKey = "ip" | "failed_logins" | "username" | "login_type" | "last_seen" | "organisation" | "land" | "ptr" | "ziel_port";
 
 const InternalAuthProblems = () => {
+  const { data: apiData } = useApiData(
+    () => fetchInternalAuthProblems(mockInternalAuthProblems),
+    [],
+    30_000
+  );
+  const sourceData = apiData ?? mockInternalAuthProblems;
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [openFilter, setOpenFilter] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("failed_logins");
@@ -33,7 +41,7 @@ const InternalAuthProblems = () => {
   };
 
   const filtered = useMemo(() => {
-    return mockInternalAuthProblems.filter((row) => {
+    return sourceData.filter((row) => {
       const vals: Record<string, string> = {
         ip: row.ip, failed_logins: String(row.failed_logins), username: row.username,
         login_type: row.login_type, last_seen: formatTime(row.last_seen),

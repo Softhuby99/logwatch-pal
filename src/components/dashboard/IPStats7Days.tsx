@@ -6,6 +6,9 @@ import { mockIPSummary } from "@/data/mockSecurityData";
 import { format } from "date-fns";
 import { ChevronDown, ChevronUp, Filter, Info } from "lucide-react";
 import { useIpDetail } from "@/contexts/IpDetailContext";
+import { useApiData } from "@/hooks/useApiData";
+import { fetchIpStats7d } from "@/lib/api";
+import type { IpSummary } from "@/types/database";
 
 const eventTypeColor = (type: string): string => {
   const t = type.toLowerCase();
@@ -28,6 +31,12 @@ type SortKey = "ip" | "total_events" | "first_seen" | "last_seen" | "last_target
 
 const IPStats7Days = () => {
   const { openIp } = useIpDetail();
+  const { data: apiData } = useApiData(
+    () => fetchIpStats7d<IpSummary>(mockIPSummary),
+    [],
+    30_000
+  );
+  const sourceData = apiData ?? mockIPSummary;
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [openFilter, setOpenFilter] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("total_events");
@@ -63,7 +72,7 @@ const IPStats7Days = () => {
   };
 
   const filtered = useMemo(() => {
-    return mockIPSummary.filter((row) => {
+    return sourceData.filter((row) => {
       const vals: Record<string, string> = {
         ip: row.ip,
         total_events: String(row.total_events),

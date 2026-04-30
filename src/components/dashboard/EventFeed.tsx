@@ -1,6 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { mockSecurityEvents } from "@/data/mockSecurityData";
+import { useApiData } from "@/hooks/useApiData";
+import { fetchSecurityEvents } from "@/lib/api";
+import type { SecurityEvent } from "@/types/database";
 
 const levelStyle = (l: string) => {
   if (l === "CRIT") return "destructive";
@@ -26,7 +29,13 @@ const timeAgo = (iso: string) => {
 };
 
 const EventFeed = () => {
-  const sorted = [...mockSecurityEvents].sort(
+  const { data } = useApiData(
+    () => fetchSecurityEvents<SecurityEvent>(mockSecurityEvents, 50),
+    [],
+    15_000
+  );
+
+  const sorted = [...(data ?? mockSecurityEvents)].sort(
     (a, b) => new Date(b.event_time).getTime() - new Date(a.event_time).getTime()
   );
 
