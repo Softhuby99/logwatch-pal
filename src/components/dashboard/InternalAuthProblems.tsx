@@ -11,6 +11,12 @@ type SortDir = "asc" | "desc" | null;
 type SortKey = "ip" | "failed_logins" | "username" | "login_type" | "last_seen" | "organisation" | "land" | "ptr" | "ziel_port";
 
 const InternalAuthProblems = () => {
+  const { data: apiData } = useApiData(
+    () => fetchInternalAuthProblems(mockInternalAuthProblems),
+    [],
+    30_000
+  );
+  const sourceData = apiData ?? mockInternalAuthProblems;
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [openFilter, setOpenFilter] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("failed_logins");
