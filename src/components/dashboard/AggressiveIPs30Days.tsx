@@ -7,6 +7,8 @@ import { format } from "date-fns";
 import { ChevronDown, ChevronUp, Filter, Info } from "lucide-react";
 import type { AlertLevel, RiskLevel } from "@/types/database";
 import { useIpDetail } from "@/contexts/IpDetailContext";
+import { useApiData } from "@/hooks/useApiData";
+import { fetchAggressiveIps30d } from "@/lib/api";
 
 const levelClass = (level: AlertLevel | null): string => {
   if (level === "CRIT") return "bg-red-500/20 text-red-400 border-red-500/30";
