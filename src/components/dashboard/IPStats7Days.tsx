@@ -72,7 +72,7 @@ const IPStats7Days = () => {
   };
 
   const filtered = useMemo(() => {
-    return mockIPSummary.filter((row) => {
+    return sourceData.filter((row) => {
       const vals: Record<string, string> = {
         ip: row.ip,
         total_events: String(row.total_events),
