@@ -1,17 +1,11 @@
-# Front-facing reverse proxy (HTTP + HTTPS).
-# `${HOSTNAME}` is substituted by the nginx env-template module.
-
-# Use Docker's internal DNS so missing upstreams don't crash nginx
 resolver 127.0.0.11 valid=30s ipv6=off;
 
-# ---------- HTTP → HTTPS redirect ----------
 server {
   listen 80;
   server_name ${HOSTNAME};
   return 301 https://$host$request_uri;
 }
 
-# ---------- HTTPS ----------
 server {
   listen 443 ssl;
   http2 on;
@@ -22,27 +16,22 @@ server {
   ssl_protocols TLSv1.2 TLSv1.3;
   ssl_prefer_server_ciphers on;
 
-  # Auth – uses a variable so nginx starts even if authentik is down
-  location /auth/ {
-    set $authentik_upstream ${AUTHENTIK_PROXY_PASS};
-    proxy_pass $authentik_upstream;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto https;
-  }
-
-  # Dashboard API
   location /api/ {
-    set $api_upstream http://api:3001;
-    proxy_pass $api_upstream;
+    proxy_pass http://api:3001/api/;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto https;
   }
 
-  # Dashboard SPA
+  location /auth/ {
+    proxy_pass https://sso.servuswir.de:9443/;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto https;
+  }
+
   location / {
     proxy_pass http://dashboard:80;
     proxy_set_header Host $host;
