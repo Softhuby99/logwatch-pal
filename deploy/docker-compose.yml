@@ -204,3 +204,8 @@ volumes:
   authentik-db:
   authentik-redis:
   authentik-media:
+
+networks:
+  default:
+  shared-db:
+    external: true
