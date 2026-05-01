@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useApiLive } from "@/contexts/ApiLiveContext";
 
 /**
  * Generic hook that calls an API fetcher on mount and at an interval,
@@ -14,6 +15,7 @@ export function useApiData<T>(
   const [loading, setLoading] = useState(true);
   const [live, setLive] = useState(false);
   const mountedRef = useRef(true);
+  const { report } = useApiLive();
 
   const load = useCallback(async () => {
     try {
@@ -21,6 +23,7 @@ export function useApiData<T>(
       if (mountedRef.current) {
         setData(result.data);
         setLive(result.live);
+        report(result.live);
       }
     } catch (err) {
       console.error("API fetch failed:", err);
