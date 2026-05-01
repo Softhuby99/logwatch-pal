@@ -38,14 +38,15 @@ services:
     ports:
       - "127.0.0.1:3001:3001"
     environment:
-      MARIADB_HOST: ${MARIADB_HOST:-host.docker.internal}
+      MARIADB_HOST: ${MARIADB_HOST:-logserver-db}
       MARIADB_PORT: ${MARIADB_PORT:-3306}
       MARIADB_USER: ${MARIADB_USER:-loguser}
       MARIADB_PASSWORD: ${MARIADB_PASSWORD:-logpass123}
       MARIADB_DATABASE: ${MARIADB_DATABASE:-logdb}
       PORT: "3001"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    networks:
+      - default
+      - shared-db
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3001/api/health"]
       interval: 15s
@@ -203,3 +204,8 @@ volumes:
   authentik-db:
   authentik-redis:
   authentik-media:
+
+networks:
+  default:
+  shared-db:
+    external: true
