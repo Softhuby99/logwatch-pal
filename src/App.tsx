@@ -11,6 +11,7 @@ import AuthCallback from "./pages/AuthCallback.tsx";
 import SetupWizard from "./pages/SetupWizard.tsx";
 import { IpDetailProvider } from "./contexts/IpDetailContext";
 import { AuthProvider } from "./contexts/AuthContext";
+import { ApiLiveProvider } from "./contexts/ApiLiveContext";
 import { RequireAuth } from "./components/auth/RequireAuth";
 
 const queryClient = new QueryClient();
@@ -22,7 +23,8 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-          <IpDetailProvider>
+          <ApiLiveProvider>
+            <IpDetailProvider>
             <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/auth/callback" element={<AuthCallback />} />
@@ -46,7 +48,8 @@ const App = () => (
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
-          </IpDetailProvider>
+            </IpDetailProvider>
+          </ApiLiveProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
