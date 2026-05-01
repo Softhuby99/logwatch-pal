@@ -1,4 +1,4 @@
-import { Shield, Activity } from "lucide-react";
+import { Shield } from "lucide-react";
 import StatsCards from "@/components/dashboard/StatsCards";
 import AuthTimeline from "@/components/dashboard/AuthTimeline";
 import TopAttackers from "@/components/dashboard/TopAttackers";
@@ -12,6 +12,7 @@ import AggressiveIPs30Days from "@/components/dashboard/AggressiveIPs30Days";
 import InternalAuthProblems from "@/components/dashboard/InternalAuthProblems";
 import GeoAttackMap from "@/components/dashboard/GeoAttackMap";
 import CollapsiblePanel from "@/components/dashboard/CollapsiblePanel";
+import HeaderUserMenu from "@/components/HeaderUserMenu";
 
 const Index = () => (
   <div className="min-h-screen bg-background text-foreground">
@@ -27,10 +28,7 @@ const Index = () => (
             <p className="text-[10px] text-muted-foreground">v2.9.3 • Mailcow + CrowdSec</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Activity className="h-3.5 w-3.5 text-emerald-400 animate-pulse" />
-          <span className="hidden sm:inline">Live Monitoring</span>
-        </div>
+        <HeaderUserMenu />
       </div>
     </header>
 
