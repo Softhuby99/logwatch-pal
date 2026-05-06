@@ -1,5 +1,6 @@
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import IpDetailView from "./IpDetailView";
+import IpDetailErrorBoundary from "./IpDetailErrorBoundary";
 
 interface Props {
   ip: string | null;
@@ -19,7 +20,11 @@ const IpDetailSheet = ({ ip, open, onOpenChange }: Props) => {
             IP Detail · Drilldown
           </SheetTitle>
         </SheetHeader>
-        {ip && <IpDetailView ip={ip} embedded />}
+        {ip && (
+          <IpDetailErrorBoundary key={ip}>
+            <IpDetailView ip={ip} embedded />
+          </IpDetailErrorBoundary>
+        )}
       </SheetContent>
     </Sheet>
   );
