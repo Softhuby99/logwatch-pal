@@ -205,12 +205,6 @@ const IpDetailView = ({ ip, embedded = false }: Props) => {
 
   return (
     <div className={embedded ? "space-y-4" : "space-y-6"}>
-      {/* DEBUG-PANEL */}
-      <div className="border border-fuchsia-500/40 bg-fuchsia-500/10 rounded p-2 text-[10px] font-mono text-fuchsia-200 whitespace-pre-wrap break-all">
-        <div className="font-semibold text-fuchsia-300 mb-1">[DEBUG · IpDetailView]</div>
-        {JSON.stringify(debugInfo, null, 2)}
-      </div>
-
       {/* Header */}
       <div className="border border-border/40 rounded bg-card/60 backdrop-blur p-4">
         <div className="flex items-start justify-between gap-4 flex-wrap">
