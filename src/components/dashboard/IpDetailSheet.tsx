@@ -1,5 +1,6 @@
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import IpDetailView from "./IpDetailView";
+import IpDetailErrorBoundary from "./IpDetailErrorBoundary";
 
 interface Props {
   ip: string | null;
