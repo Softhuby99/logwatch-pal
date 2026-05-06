@@ -178,39 +178,8 @@ const IpDetailView = ({ ip, embedded = false }: Props) => {
 
   const { summary, enrichment, risk, events, stats, by_type, ban_intervals } = data;
 
-  // ── Diagnose-Banner (temporär) ─────────────────────────────
-  const rawSec = eventsQ.data?.security_events?.length ?? 0;
-  const rawAuth = eventsQ.data?.auth_events?.length ?? 0;
-  const debugInfo = {
-    detailLive: detailQ.live,
-    eventsLive: eventsQ.live,
-    detailLoading: detailQ.loading,
-    eventsLoading: eventsQ.loading,
-    rawSecurityEvents: rawSec,
-    rawAuthEvents: rawAuth,
-    builtEvents: events.length,
-    statsTotal: stats.total,
-    summaryTotal: summary?.total_events ?? null,
-    firstSecSample: eventsQ.data?.security_events?.[0]
-      ? {
-          id: eventsQ.data.security_events[0].id,
-          event_time: eventsQ.data.security_events[0].event_time,
-          ip: eventsQ.data.security_events[0].ip,
-          source_component: eventsQ.data.security_events[0].source_component,
-          ban_status: eventsQ.data.security_events[0].ban_status,
-          alert_level: eventsQ.data.security_events[0].alert_level,
-        }
-      : null,
-  };
-
   return (
     <div className={embedded ? "space-y-4" : "space-y-6"}>
-      {/* DEBUG-PANEL */}
-      <div className="border border-fuchsia-500/40 bg-fuchsia-500/10 rounded p-2 text-[10px] font-mono text-fuchsia-200 whitespace-pre-wrap break-all">
-        <div className="font-semibold text-fuchsia-300 mb-1">[DEBUG · IpDetailView]</div>
-        {JSON.stringify(debugInfo, null, 2)}
-      </div>
-
       {/* Header */}
       <div className="border border-border/40 rounded bg-card/60 backdrop-blur p-4">
         <div className="flex items-start justify-between gap-4 flex-wrap">
