@@ -27,11 +27,23 @@ import {
   Eye,
 } from "lucide-react";
 import { format } from "date-fns";
-import { getIpTimeline, type IpTimelineEvent, type TimelineEventKind } from "@/lib/ipTimeline";
+import { getIpTimeline, buildIpTimelineBundle, type IpTimelineEvent, type TimelineEventKind } from "@/lib/ipTimeline";
+import { fetchIpDetail, fetchIpEvents } from "@/lib/api";
+import { useApiData } from "@/hooks/useApiData";
 import BanTimeline from "./BanTimeline";
 import IpActivityChart from "./IpActivityChart";
-import type { AlertLevel, RiskLevel } from "@/types/database";
+import type { AlertLevel, RiskLevel, SecurityEvent, AuthEvent, IpSummary, IpEnrichment, IpRiskScore } from "@/types/database";
 import { useIpDetail } from "@/contexts/IpDetailContext";
+
+interface IpDetailApi {
+  summary: IpSummary | null;
+  enrichment: IpEnrichment | null;
+  risk: IpRiskScore | null;
+}
+interface IpEventsApi {
+  security_events: SecurityEvent[];
+  auth_events: AuthEvent[];
+}
 
 interface Props {
   ip: string;
