@@ -27,11 +27,23 @@ import {
   Eye,
 } from "lucide-react";
 import { format } from "date-fns";
-import { getIpTimeline, type IpTimelineEvent, type TimelineEventKind } from "@/lib/ipTimeline";
+import { getIpTimeline, buildIpTimelineBundle, type IpTimelineEvent, type TimelineEventKind } from "@/lib/ipTimeline";
+import { fetchIpDetail, fetchIpEvents } from "@/lib/api";
+import { useApiData } from "@/hooks/useApiData";
 import BanTimeline from "./BanTimeline";
 import IpActivityChart from "./IpActivityChart";
-import type { AlertLevel, RiskLevel } from "@/types/database";
+import type { AlertLevel, RiskLevel, SecurityEvent, AuthEvent, IpSummary, IpEnrichment, IpRiskScore } from "@/types/database";
 import { useIpDetail } from "@/contexts/IpDetailContext";
+
+interface IpDetailApi {
+  summary: IpSummary | null;
+  enrichment: IpEnrichment | null;
+  risk: IpRiskScore | null;
+}
+interface IpEventsApi {
+  security_events: SecurityEvent[];
+  auth_events: AuthEvent[];
+}
 
 interface Props {
   ip: string;
@@ -140,7 +152,30 @@ const FullViewLink = ({ ip }: { ip: string }) => {
 };
 
 const IpDetailView = ({ ip, embedded = false }: Props) => {
-  const data = useMemo(() => getIpTimeline(ip), [ip]);
+  const detailQ = useApiData<IpDetailApi>(
+    () => fetchIpDetail<IpDetailApi>(ip, { summary: null, enrichment: null, risk: null }),
+    [ip]
+  );
+  const eventsQ = useApiData<IpEventsApi>(
+    () => fetchIpEvents<IpEventsApi>(ip, { security_events: [], auth_events: [] }),
+    [ip]
+  );
+
+  const data = useMemo(() => {
+    // Wenn die API live ist, nutzen wir ihre Daten – sonst Fallback auf Mock-Suche.
+    if (detailQ.live || eventsQ.live) {
+      return buildIpTimelineBundle(
+        ip,
+        eventsQ.data?.security_events ?? [],
+        eventsQ.data?.auth_events ?? [],
+        detailQ.data?.summary ?? null,
+        detailQ.data?.enrichment ?? null,
+        detailQ.data?.risk ?? null
+      );
+    }
+    return getIpTimeline(ip);
+  }, [ip, detailQ.live, eventsQ.live, detailQ.data, eventsQ.data]);
+
   const { summary, enrichment, risk, events, stats, by_type, ban_intervals } = data;
 
   return (
