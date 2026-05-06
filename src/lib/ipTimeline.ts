@@ -61,10 +61,25 @@ export interface IpTimelineEvent {
 }
 
 const classifySecurity = (e: SecurityEvent): TimelineEventKind => {
-  if (e.ban_status === "banning") return "ban";
-  if (e.ban_status === "unbanning") return "unban";
+  // Ban-/Unban-Events können sowohl über ban_status (Pipeline-normalisiert)
+  // als auch über event_type (roher Wert aus netfilter/crowdsec) erkannt werden.
+  const et = (e.event_type || "").toLowerCase();
+  const reason = (e.normalized_reason || "").toUpperCase();
+  if (
+    e.ban_status === "banning" ||
+    et === "ban" ||
+    et === "banning" ||
+    reason === "BANNING" ||
+    reason.includes("BRUTEFORCE") && (e.source_component === "crowdsec" || et === "ban")
+  ) return "ban";
+  if (
+    e.ban_status === "unbanning" ||
+    et === "unban" ||
+    et === "unbanning" ||
+    reason === "UNBANNING"
+  ) return "unban";
   if (e.source_component === "crowdsec" || e.source_system === "opnsense") return "crowdsec";
-  if (e.normalized_reason?.includes("AUTH_FAILED")) return "auth_failure";
+  if (reason.includes("AUTH_FAILED")) return "auth_failure";
   return "security_event";
 };
 
