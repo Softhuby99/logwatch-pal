@@ -31,11 +31,11 @@ interface CrowdSecAlert {
 
 const CrowdSecAlerts = () => {
   const { data } = useApiData(
-    () => fetchCrowdsecAlerts<CrowdSecAlert>(mockCrowdSecAlerts),
+    () => fetchCrowdsecAlerts<CrowdSecAlert>([]),
     [],
     30_000
   );
-  const alerts = data ?? mockCrowdSecAlerts;
+  const alerts = data ?? [];
 
   return (
     <Card className="border-border/50 bg-card/80 backdrop-blur">
