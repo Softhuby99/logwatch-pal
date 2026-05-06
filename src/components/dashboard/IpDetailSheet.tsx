@@ -13,7 +13,7 @@ const IpDetailSheet = ({ ip, open, onOpenChange }: Props) => {
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="w-full sm:max-w-2xl lg:max-w-3xl overflow-y-auto bg-background border-l border-border/50 p-4 sm:p-6"
+        className="w-full sm:max-w-none sm:w-[90vw] lg:w-[80vw] xl:w-[70vw] 2xl:w-[1400px] overflow-y-auto bg-background border-l border-border/50 p-4 sm:p-6"
       >
         <SheetHeader className="mb-4">
           <SheetTitle className="text-sm font-normal text-muted-foreground tracking-wide">
