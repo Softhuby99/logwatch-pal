@@ -215,15 +215,37 @@ const IpDetailView = ({ ip, embedded = false }: Props) => {
         </div>
       </div>
 
-      {/* Stats Tiles */}
-      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-        <StatTile label="Total" value={stats.total} />
-        <StatTile label="Bans" value={stats.bans} accent="text-red-400" />
-        <StatTile label="Unbans" value={stats.unbans} accent="text-emerald-400" />
-        <StatTile label="Auth Fail" value={stats.auth_failures} accent="text-amber-400" />
-        <StatTile label="CrowdSec" value={stats.crowdsec} accent="text-blue-400" />
-        <StatTile label="Andere" value={stats.other} accent="text-orange-400" />
-      </div>
+      {/* Stats Tiles – fallback auf Summary, wenn Detail-Events fehlen */}
+      {(() => {
+        const noEvents = stats.total === 0;
+        const totalDisplay = noEvents && summary?.total_events ? Number(summary.total_events) : stats.total;
+        const bansDisplay = noEvents && summary?.total_bans ? Number(summary.total_bans) : stats.bans;
+        const authDisplay =
+          noEvents && summary?.total_auth_failures ? Number(summary.total_auth_failures) : stats.auth_failures;
+        return (
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+            <StatTile label="Total" value={totalDisplay} />
+            <StatTile label="Bans" value={bansDisplay} accent="text-red-400" />
+            <StatTile label="Unbans" value={stats.unbans} accent="text-emerald-400" />
+            <StatTile label="Auth Fail" value={authDisplay} accent="text-amber-400" />
+            <StatTile label="CrowdSec" value={stats.crowdsec} accent="text-blue-400" />
+            <StatTile label="Andere" value={stats.other} accent="text-orange-400" />
+          </div>
+        );
+      })()}
+
+      {/* Hinweis wenn Summary Events kennt, aber keine Detail-Events vorliegen */}
+      {stats.total === 0 && summary && (Number(summary.total_events) > 0 || Number(summary.total_bans) > 0) && (
+        <div className="border border-amber-500/30 bg-amber-500/10 rounded p-3 text-xs text-amber-300/90">
+          <div className="font-semibold mb-1">Keine Detail-Events in security_events / auth_events</div>
+          <div className="text-amber-200/70 font-mono text-[11px] leading-relaxed">
+            Die <code>ip_summary</code> meldet {Number(summary.total_events)} Events / {Number(summary.total_bans)} Bans
+            für diese IP, aber die Detail-Tabellen enthalten keine Einträge. Vermutlich liegen die Roh-Events in
+            einer anderen Tabelle (z.B. <code>bans</code> oder einer Netfilter-Raw-Tabelle), die das API noch nicht abfragt.
+            Die Stat-Tiles oben zeigen die Summary-Werte als Fallback.
+          </div>
+        </div>
+      )}
 
       {/* Ban-Historie (eigene Zeitlinie) */}
       <BanTimeline intervals={ban_intervals} compact={embedded} events={events} />
