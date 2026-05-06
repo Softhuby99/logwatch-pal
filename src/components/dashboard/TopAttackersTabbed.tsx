@@ -80,16 +80,13 @@ const TopAttackersTabbed = () => {
   const [openFilter, setOpenFilter] = useState<string | null>(null);
   const filterRef = useRef<HTMLDivElement>(null);
 
-  // Mock fallback aus dem alten lokalen Aggregator
-  const mockRows = useMemo(() => getTopAttackers(active, 100), [active]);
-
   const { data: apiRows } = useApiData(
-    () => fetchTopAttackers<TopAttackerRow>(active, mockRows, 100),
+    () => fetchTopAttackers<TopAttackerRow>(active, [], 100),
     [active],
     30_000,
   );
 
-  const rows = (apiRows ?? mockRows) as TopAttackerRow[];
+  const rows = (apiRows ?? []) as TopAttackerRow[];
 
   useEffect(() => {
     const h = (e: MouseEvent) => {
