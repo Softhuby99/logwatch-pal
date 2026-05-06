@@ -9,6 +9,8 @@ async function apiFetch<T>(path: string, fallback: T): Promise<{ data: T; live: 
   try {
     const res = await fetch(`${API_BASE}${path}`, {
       signal: AbortSignal.timeout(8000),
+      cache: "no-store",
+      headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
