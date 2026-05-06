@@ -76,6 +76,21 @@ const BanTimeline = ({ intervals, compact = false, events = [] }: Props) => {
     };
   }, [intervals]);
 
+  // Angriffs-Events innerhalb des sichtbaren Zeitfensters
+  // WICHTIG: useMemo MUSS vor jedem early-return stehen (Rules of Hooks).
+  const attackEvents = useMemo(() => {
+    return events
+      .filter((e) => ATTACK_KIND_META[e.kind])
+      .map((e) => ({ ev: e, t: new Date(e.event_time).getTime() }))
+      .filter((x) => x.t >= minMs && x.t <= maxMs);
+  }, [events, minMs, maxMs]);
+
+  const attackCounts = useMemo(() => {
+    const counts: Partial<Record<TimelineEventKind, number>> = {};
+    for (const { ev } of attackEvents) counts[ev.kind] = (counts[ev.kind] ?? 0) + 1;
+    return counts;
+  }, [attackEvents]);
+
   if (validIntervals.length === 0) {
     return (
       <div className="border border-border/40 rounded bg-card/60 p-4">
@@ -96,20 +111,6 @@ const BanTimeline = ({ intervals, compact = false, events = [] }: Props) => {
 
   const totalBannedMs = validIntervals.reduce((s, i) => s + i.duration_ms, 0);
   const activeCount = validIntervals.filter((i) => i.active).length;
-
-  // Angriffs-Events innerhalb des sichtbaren Zeitfensters
-  const attackEvents = useMemo(() => {
-    return events
-      .filter((e) => ATTACK_KIND_META[e.kind])
-      .map((e) => ({ ev: e, t: new Date(e.event_time).getTime() }))
-      .filter((x) => x.t >= minMs && x.t <= maxMs);
-  }, [events, minMs, maxMs]);
-
-  const attackCounts = useMemo(() => {
-    const counts: Partial<Record<TimelineEventKind, number>> = {};
-    for (const { ev } of attackEvents) counts[ev.kind] = (counts[ev.kind] ?? 0) + 1;
-    return counts;
-  }, [attackEvents]);
 
   return (
     <div className="border border-border/40 rounded bg-card/60">
