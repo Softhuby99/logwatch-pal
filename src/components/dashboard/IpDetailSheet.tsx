@@ -20,7 +20,11 @@ const IpDetailSheet = ({ ip, open, onOpenChange }: Props) => {
             IP Detail · Drilldown
           </SheetTitle>
         </SheetHeader>
-        {ip && <IpDetailView ip={ip} embedded />}
+        {ip && (
+          <IpDetailErrorBoundary key={ip}>
+            <IpDetailView ip={ip} embedded />
+          </IpDetailErrorBoundary>
+        )}
       </SheetContent>
     </Sheet>
   );
