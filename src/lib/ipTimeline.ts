@@ -271,6 +271,26 @@ const computeDaily = (events: IpTimelineEvent[]) => {
   return Array.from(map.entries()).map(([date, v]) => ({ date, ...v }));
 };
 
+/**
+ * Baut ein IpTimelineBundle aus beliebigen Quell-Events
+ * (z.B. live aus der API oder aus den Mocks).
+ */
+export const buildIpTimelineBundle = (
+  ip: string,
+  secEvents: SecurityEvent[],
+  authEvents: AuthEvent[],
+  summary: IpSummary | null,
+  enrichment: IpEnrichment | null,
+  risk: IpRiskScore | null
+): IpTimelineBundle => {
+  const sec = secEvents.map(toTimelineFromSecurity);
+  const auth = authEvents.map(toTimelineFromAuth);
+  const events = [...sec, ...auth].sort(
+    (a, b) => new Date(b.event_time).getTime() - new Date(a.event_time).getTime()
+  );
+  return assembleBundle(ip, events, summary, enrichment, risk);
+};
+
 export const getIpTimeline = (ip: string): IpTimelineBundle => {
   const sec = mockSecurityEvents.filter((e) => e.ip === ip).map(toTimelineFromSecurity);
   const auth = mockAuthEvents.filter((e) => e.ip === ip).map(toTimelineFromAuth);
@@ -281,6 +301,16 @@ export const getIpTimeline = (ip: string): IpTimelineBundle => {
   const summary = mockIPSummary.find((s) => s.ip === ip) ?? null;
   const enrichment = mockIPEnrichment.find((e) => e.ip === ip) ?? null;
   const risk = mockIPRiskScore.find((r) => r.ip === ip) ?? null;
+  return assembleBundle(ip, events, summary, enrichment, risk);
+};
+
+const assembleBundle = (
+  ip: string,
+  events: IpTimelineEvent[],
+  summary: IpSummary | null,
+  enrichment: IpEnrichment | null,
+  risk: IpRiskScore | null
+): IpTimelineBundle => {
 
   const stats = {
     total: events.length,
