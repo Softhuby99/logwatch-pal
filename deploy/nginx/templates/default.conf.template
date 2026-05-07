@@ -24,6 +24,15 @@ server {
     proxy_set_header X-Forwarded-Proto https;
   }
 
+  # OIDC callback belongs to the SPA, NOT to authentik. Must come BEFORE the
+  # /auth/ proxy block so it wins the longest-prefix match (= sign forces
+  # exact match).
+  location = /auth/callback {
+    proxy_pass http://dashboard:80/auth/callback;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto https;
+  }
+
   location /auth/ {
     proxy_pass https://sso.servuswir.de:9443/;
     proxy_set_header Host $host;
