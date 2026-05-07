@@ -1004,6 +1004,255 @@ app.post("/api/setup/ssh-test", async (req, res) => {
   });
 });
 
+// ─────────────────────────────────────────────────────────────
+// Remote integrations: SSH ping, OPNsense API, Mailcow API,
+// CrowdSec LAPI. All read env vars; if not configured, returns
+// 503 with a helpful message instead of crashing.
+// ─────────────────────────────────────────────────────────────
+
+// shared HTTPS agent that ignores self-signed certs when the corresponding
+// _INSECURE_TLS flag is "1" (typical for internal appliances).
+const insecureAgent = new https.Agent({ rejectUnauthorized: false });
+
+function pickAgent(url, insecure) {
+  if (!url) return undefined;
+  if (url.startsWith("https://") && insecure) return insecureAgent;
+  return undefined;
+}
+
+async function jsonFetch(url, opts = {}, { insecure = false, timeoutMs = 8000 } = {}) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      ...opts,
+      signal: ctrl.signal,
+      // @ts-ignore – node fetch supports `agent` via undici dispatcher; for
+      // self-signed we fall back to https.request below if needed.
+    });
+    return res;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+// Low-level https request that supports the insecure agent (node fetch in
+// node 20 does not honor a custom https.Agent reliably across versions).
+function httpsRequest(targetUrl, { method = "GET", headers = {}, body, insecure = false, timeoutMs = 8000 } = {}) {
+  return new Promise((resolve, reject) => {
+    let u;
+    try { u = new URL(targetUrl); } catch (e) { return reject(e); }
+    const lib = u.protocol === "https:" ? https : http;
+    const req = lib.request({
+      method,
+      hostname: u.hostname,
+      port: u.port || (u.protocol === "https:" ? 443 : 80),
+      path: u.pathname + (u.search || ""),
+      headers,
+      ...(u.protocol === "https:" && insecure ? { rejectUnauthorized: false } : {}),
+    }, (res) => {
+      const chunks = [];
+      res.on("data", (c) => chunks.push(c));
+      res.on("end", () => {
+        const buf = Buffer.concat(chunks).toString("utf8");
+        resolve({ status: res.statusCode || 0, headers: res.headers, body: buf });
+      });
+    });
+    req.on("error", reject);
+    req.setTimeout(timeoutMs, () => req.destroy(new Error(`timeout after ${timeoutMs}ms`)));
+    if (body) req.write(typeof body === "string" ? body : JSON.stringify(body));
+    req.end();
+  });
+}
+
+function parseRemoteHosts() {
+  const raw = process.env.REMOTE_HOSTS || "";
+  return raw.split(",").map((s) => s.trim()).filter(Boolean).map((entry) => {
+    const m = entry.match(/^([^@]+)@(.+?)(?::(\d+))?$/);
+    if (!m) return null;
+    return { user: m[1], host: m[2], port: parseInt(m[3] || "22", 10), id: entry };
+  }).filter(Boolean);
+}
+
+async function sshExec({ user, host, port = 22, command, timeoutMs = 10000 }) {
+  const keyPath = path.join(SSH_KEY_DIR, SSH_KEY_NAME);
+  try { await fs.promises.access(keyPath); } catch {
+    return { ok: false, error: "SSH-Key fehlt – /api/setup/ssh-keygen aufrufen." };
+  }
+  const t0 = Date.now();
+  const r = await runCmd("ssh", [
+    "-i", keyPath, "-p", String(port),
+    "-o","BatchMode=yes",
+    "-o","StrictHostKeyChecking=accept-new",
+    "-o","ConnectTimeout=6",
+    "-o","UserKnownHostsFile=" + path.join(SSH_KEY_DIR, "known_hosts"),
+    `${user}@${host}`, command,
+  ], { timeoutMs });
+  return { ok: r.ok, code: r.code, latency_ms: Date.now() - t0,
+           stdout: r.stdout.trim(), stderr: r.stderr.trim() };
+}
+
+// GET /api/remote/hosts – list configured SSH targets (no secrets)
+app.get("/api/remote/hosts", (_req, res) => {
+  res.json({ hosts: parseRemoteHosts().map(({ id, user, host, port }) => ({ id, user, host, port })) });
+});
+
+// GET /api/remote/ping?host=user@ip  – simple uptime probe via SSH
+app.get("/api/remote/ping", async (req, res) => {
+  const target = String(req.query.host || "").trim();
+  const all = parseRemoteHosts();
+  const t = target ? all.find((h) => h.id === target) : null;
+  if (!t) return res.status(400).json({ ok: false, error: "host nicht in REMOTE_HOSTS gefunden", available: all.map((h) => h.id) });
+  const r = await sshExec({ ...t, command: "uptime && echo --- && df -h / | tail -1" });
+  res.json({ host: t.id, ...r });
+});
+
+// GET /api/remote/status – ping all configured hosts in parallel
+app.get("/api/remote/status", async (_req, res) => {
+  const hosts = parseRemoteHosts();
+  if (!hosts.length) return res.json({ hosts: [], note: "REMOTE_HOSTS leer" });
+  const results = await Promise.all(hosts.map(async (h) => {
+    const r = await sshExec({ ...h, command: "uptime", timeoutMs: 8000 });
+    return { id: h.id, ok: r.ok, latency_ms: r.latency_ms, uptime: r.ok ? r.stdout : null, error: r.ok ? null : (r.stderr || r.error) };
+  }));
+  res.json({ hosts: results, checked_at: new Date().toISOString() });
+});
+
+// ── OPNsense ────────────────────────────────────────────────
+function opnsenseAuthHeader() {
+  const k = process.env.OPNSENSE_API_KEY, s = process.env.OPNSENSE_API_SECRET;
+  if (!k || !s) return null;
+  return "Basic " + Buffer.from(`${k}:${s}`).toString("base64");
+}
+
+async function opnsenseCall(pathname) {
+  const base = process.env.OPNSENSE_HOST;
+  const auth = opnsenseAuthHeader();
+  if (!base || !auth) {
+    return { configured: false, error: "OPNSENSE_HOST / API_KEY / API_SECRET fehlen" };
+  }
+  const insecure = (process.env.OPNSENSE_INSECURE_TLS || "1") === "1";
+  const url = base.replace(/\/+$/, "") + pathname;
+  const t0 = Date.now();
+  try {
+    const r = await httpsRequest(url, { headers: { Authorization: auth, Accept: "application/json" }, insecure, timeoutMs: 8000 });
+    let parsed = null;
+    try { parsed = JSON.parse(r.body); } catch { parsed = { raw: r.body.slice(0, 400) }; }
+    return { configured: true, ok: r.status >= 200 && r.status < 300, status: r.status, latency_ms: Date.now() - t0, data: parsed };
+  } catch (e) {
+    return { configured: true, ok: false, error: e.message, latency_ms: Date.now() - t0 };
+  }
+}
+
+// GET /api/opnsense/status – simple "is the API reachable?" probe
+app.get("/api/opnsense/status", async (_req, res) => {
+  const r = await opnsenseCall("/api/core/firmware/status");
+  if (!r.configured) return res.status(503).json(r);
+  res.json(r);
+});
+
+// GET /api/opnsense/aliases
+app.get("/api/opnsense/aliases", async (_req, res) => {
+  const r = await opnsenseCall("/api/firewall/alias/get");
+  if (!r.configured) return res.status(503).json(r);
+  res.json(r);
+});
+
+// ── Mailcow ─────────────────────────────────────────────────
+async function mailcowCall(pathname) {
+  const base = process.env.MAILCOW_HOST;
+  const key = process.env.MAILCOW_API_KEY;
+  if (!base || !key) return { configured: false, error: "MAILCOW_HOST / MAILCOW_API_KEY fehlen" };
+  const insecure = (process.env.MAILCOW_INSECURE_TLS || "1") === "1";
+  const url = base.replace(/\/+$/, "") + pathname;
+  const t0 = Date.now();
+  try {
+    const r = await httpsRequest(url, { headers: { "X-API-Key": key, Accept: "application/json" }, insecure, timeoutMs: 8000 });
+    let parsed = null;
+    try { parsed = JSON.parse(r.body); } catch { parsed = { raw: r.body.slice(0, 400) }; }
+    return { configured: true, ok: r.status >= 200 && r.status < 300, status: r.status, latency_ms: Date.now() - t0, data: parsed };
+  } catch (e) {
+    return { configured: true, ok: false, error: e.message, latency_ms: Date.now() - t0 };
+  }
+}
+
+// GET /api/mailcow/status – queue size + version
+app.get("/api/mailcow/status", async (_req, res) => {
+  const [version, queue] = await Promise.all([
+    mailcowCall("/api/v1/get/status/version"),
+    mailcowCall("/api/v1/get/mailq/all"),
+  ]);
+  if (!version.configured) return res.status(503).json(version);
+  const queueLen = Array.isArray(queue.data) ? queue.data.length : null;
+  res.json({
+    ok: version.ok && queue.ok,
+    version: version.data,
+    queue_size: queueLen,
+    latency_ms: Math.max(version.latency_ms || 0, queue.latency_ms || 0),
+  });
+});
+
+// ── CrowdSec LAPI ───────────────────────────────────────────
+async function crowdsecCall(pathname) {
+  const base = process.env.CROWDSEC_LAPI_URL;
+  const key = process.env.CROWDSEC_BOUNCER_KEY;
+  if (!base || !key) return { configured: false, error: "CROWDSEC_LAPI_URL / CROWDSEC_BOUNCER_KEY fehlen" };
+  const url = base.replace(/\/+$/, "") + pathname;
+  const t0 = Date.now();
+  try {
+    const r = await httpsRequest(url, {
+      headers: { "X-Api-Key": key, Accept: "application/json" },
+      insecure: true, timeoutMs: 8000,
+    });
+    let parsed = null;
+    try { parsed = JSON.parse(r.body); } catch { parsed = { raw: r.body.slice(0, 400) }; }
+    return { configured: true, ok: r.status >= 200 && r.status < 300, status: r.status, latency_ms: Date.now() - t0, data: parsed };
+  } catch (e) {
+    return { configured: true, ok: false, error: e.message, latency_ms: Date.now() - t0 };
+  }
+}
+
+// GET /api/crowdsec/decisions – active bans/decisions
+app.get("/api/crowdsec/decisions", async (_req, res) => {
+  const r = await crowdsecCall("/v1/decisions");
+  if (!r.configured) return res.status(503).json(r);
+  const list = Array.isArray(r.data) ? r.data : [];
+  res.json({
+    ok: r.ok, status: r.status, latency_ms: r.latency_ms,
+    count: list.length,
+    decisions: list.slice(0, 200).map((d) => ({
+      id: d.id, type: d.type, scope: d.scope, value: d.value,
+      origin: d.origin, scenario: d.scenario, duration: d.duration, until: d.until,
+    })),
+  });
+});
+
+// GET /api/integrations/status – overview tile
+app.get("/api/integrations/status", async (_req, res) => {
+  const [opn, mc, cs, hosts] = await Promise.all([
+    opnsenseCall("/api/core/firmware/status"),
+    mailcowCall("/api/v1/get/status/version"),
+    crowdsecCall("/v1/decisions"),
+    (async () => {
+      const list = parseRemoteHosts();
+      if (!list.length) return { configured: false };
+      const results = await Promise.all(list.map(async (h) => {
+        const r = await sshExec({ ...h, command: "uptime", timeoutMs: 6000 });
+        return { id: h.id, ok: r.ok, latency_ms: r.latency_ms };
+      }));
+      return { configured: true, hosts: results };
+    })(),
+  ]);
+  res.json({
+    checked_at: new Date().toISOString(),
+    opnsense:  { configured: !!opn.configured, ok: !!opn.ok, status: opn.status, latency_ms: opn.latency_ms, error: opn.error },
+    mailcow:   { configured: !!mc.configured,  ok: !!mc.ok,  status: mc.status,  latency_ms: mc.latency_ms,  error: mc.error  },
+    crowdsec:  { configured: !!cs.configured,  ok: !!cs.ok,  status: cs.status,  latency_ms: cs.latency_ms,  error: cs.error,
+                 active_decisions: Array.isArray(cs.data) ? cs.data.length : null },
+    ssh: hosts,
+  });
+});
+
 // ── Start ────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, "0.0.0.0", () => {
