@@ -83,6 +83,7 @@ const STEPS = [
   { id: "db", label: "Datenbank", icon: Database },
   { id: "backup", label: "Backup & Cron", icon: HardDrive },
   { id: "web", label: "Web / TLS", icon: ShieldCheck },
+  { id: "ssh", label: "SSH-Targets", icon: Terminal },
   { id: "sso", label: "SSO (Authentik)", icon: KeyRound },
   { id: "review", label: "Übersicht", icon: Check },
 ] as const;
