@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Activity, Info, LogOut, RefreshCw, Settings2, User as UserIcon } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Activity, Heart, Info, LogOut, RefreshCw, Settings2, User as UserIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,6 +16,8 @@ import { useApiLive } from "@/contexts/ApiLiveContext";
 import { useRefreshSettings } from "@/contexts/RefreshSettingsContext";
 import { ToolsDialog } from "@/components/ToolsDialog";
 import { InfoDialog } from "@/components/InfoDialog";
+import { SystemStatusDialog } from "@/components/SystemStatusDialog";
+import { fetchHealthChecks, type HealthResponse } from "@/lib/api";
 
 const initialsOf = (name: string) =>
   name
