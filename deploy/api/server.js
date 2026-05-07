@@ -56,6 +56,12 @@ app.get("/api/ssh/pubkey", (_req, res) => {
   }
 });
 
+// Version marker — bump on each meaningful change so we can confirm
+// the running container actually has the new code.
+const API_VERSION = "0.5.0-ssh-bootstrap";
+app.get("/api/version", (_req, res) => res.json({ version: API_VERSION }));
+console.log(`[startup] API version ${API_VERSION}`);
+
 // ── DB pool ──────────────────────────────────────────────────
 const pool = mysql.createPool({
   host: process.env.MARIADB_HOST || "host.docker.internal",
