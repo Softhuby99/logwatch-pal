@@ -151,6 +151,7 @@ export const HeaderUserMenu = () => {
 
       <ToolsDialog open={toolsOpen} onOpenChange={setToolsOpen} />
       <InfoDialog open={infoOpen} onOpenChange={setInfoOpen} />
+      <SystemStatusDialog open={statusOpen} onOpenChange={setStatusOpen} />
     </div>
   );
 };
