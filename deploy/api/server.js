@@ -716,7 +716,7 @@ app.post("/api/tools/run", (req, res) => {
 
 // ── System Status / Health Checks ────────────────────────────
 import os from "os";
-import fs from "fs";
+// fs already imported at top of file
 import https from "https";
 import http from "http";
 import { execFile } from "child_process";
