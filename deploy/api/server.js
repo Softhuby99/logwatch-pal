@@ -482,17 +482,43 @@ const TOOL_SCRIPTS = {
     label: "IP Enricher (GeoIP / ASN nachladen)",
     args: ["-m", "src.metrics.ip_enricher"],
     description:
-      "Lädt fehlende GeoIP-, ASN- und Org-Infos für IPs in ip_enrichment nach.",
+      "Lädt fehlende GeoIP-, ASN- und Org-Infos für IPs in ip_enrichment nach. Behebt '??' in der Spalte Land der Top-Angreifer.",
   },
-  risk_score: {
+  risk_engine: {
     label: "Risk-Score neu berechnen",
-    args: ["-m", "src.metrics.risk_score"],
-    description: "Berechnet den Risiko-Score für alle bekannten IPs neu.",
+    args: ["-m", "src.metrics.ip_risk_engine"],
+    description:
+      "Berechnet den Risiko-Score für alle bekannten IPs neu (ip_risk_engine).",
   },
-  ip_summary: {
-    label: "IP-Summary aktualisieren",
-    args: ["-m", "src.metrics.ip_summary"],
-    description: "Aktualisiert die ip_summary-Aggregat-Tabelle.",
+  daily_summary: {
+    label: "Daily-Summary neu aufbauen",
+    args: ["-m", "src.metrics.daily_summary_builder"],
+    description:
+      "Aktualisiert die täglichen Aggregat-Tabellen (ip_summary, daily_*).",
+  },
+  crowdsec_sync: {
+    label: "CrowdSec Decisions synchronisieren",
+    args: ["-m", "src.crowdsec.crowdsec_decision_sync"],
+    description:
+      "Holt die aktuelle CrowdSec-Bann-Liste (cscli decisions) und synchronisiert sie in die DB.",
+  },
+  crowdsec_fetch: {
+    label: "CrowdSec Alerts abholen",
+    args: ["-m", "src.fetchers.crowdsec_fetcher"],
+    description:
+      "Pollt CrowdSec-Alerts von den konfigurierten Quellen und schreibt sie in die DB.",
+  },
+  ssh_fetch: {
+    label: "SSH Auth-Logs abholen",
+    args: ["-m", "src.fetchers.ssh_fetcher"],
+    description:
+      "Holt SSH-Authentifizierungs-Logs von den überwachten Hosts.",
+  },
+  check_db: {
+    label: "DB Health-Check",
+    args: ["check_db.py"],
+    description:
+      "Read-only: Verbindungstest, Row-Counts und Status der wichtigsten Tabellen.",
   },
 };
 

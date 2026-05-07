@@ -27,17 +27,41 @@ const KNOWN_TOOLS: ToolDef[] = [
     id: "ip_enricher",
     label: "IP Enricher (GeoIP / ASN nachladen)",
     description:
-      "Lädt fehlende GeoIP-, ASN- und Org-Infos für IPs ohne Enrichment nach.",
+      "Lädt fehlende GeoIP-, ASN- und Org-Infos nach. Behebt '??' in der Spalte Land der Top-Angreifer.",
   },
   {
-    id: "risk_score",
+    id: "risk_engine",
     label: "Risk-Score neu berechnen",
     description: "Berechnet den Risiko-Score für alle bekannten IPs neu.",
   },
   {
-    id: "ip_summary",
-    label: "IP-Summary aktualisieren",
-    description: "Aktualisiert die ip_summary-Aggregat-Tabelle.",
+    id: "daily_summary",
+    label: "Daily-Summary neu aufbauen",
+    description:
+      "Aktualisiert die täglichen Aggregat-Tabellen (ip_summary, daily_*).",
+  },
+  {
+    id: "crowdsec_sync",
+    label: "CrowdSec Decisions synchronisieren",
+    description:
+      "Synchronisiert die aktuelle CrowdSec-Bann-Liste (cscli decisions) in die DB.",
+  },
+  {
+    id: "crowdsec_fetch",
+    label: "CrowdSec Alerts abholen",
+    description:
+      "Pollt CrowdSec-Alerts von den konfigurierten Quellen.",
+  },
+  {
+    id: "ssh_fetch",
+    label: "SSH Auth-Logs abholen",
+    description: "Holt SSH-Authentifizierungs-Logs von den überwachten Hosts.",
+  },
+  {
+    id: "check_db",
+    label: "DB Health-Check (read-only)",
+    description:
+      "Verbindungstest, Row-Counts und Status der wichtigsten Tabellen.",
   },
 ];
 
