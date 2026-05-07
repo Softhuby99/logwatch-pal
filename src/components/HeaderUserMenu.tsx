@@ -67,6 +67,25 @@ export const HeaderUserMenu = () => {
         <RefreshCw className={`h-3.5 w-3.5 ${spinning ? "animate-spin" : ""}`} />
       </Button>
 
+      {/* System Status dot */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-7 w-7 relative"
+        title="System Status"
+        onClick={() => setStatusOpen(true)}
+      >
+        <Heart className="h-3.5 w-3.5" />
+        <span
+          className={`absolute top-1 right-1 h-1.5 w-1.5 rounded-full ${
+            overall === "ok" ? "bg-emerald-400"
+            : overall === "warn" ? "bg-amber-400"
+            : overall === "error" ? "bg-red-400 animate-pulse"
+            : "bg-muted-foreground/40"
+          }`}
+        />
+      </Button>
+
       {/* Live / Demo Indicator */}
       {live ? (
         <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-400 border-emerald-500/30 gap-1">
