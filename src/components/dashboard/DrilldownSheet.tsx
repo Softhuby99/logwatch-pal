@@ -105,7 +105,7 @@ export const DrilldownSheet = ({ open, onOpenChange, title, subtitle, endpoint }
           </div>
         )}
         {error && (
-          <div className="border border-destructive/40 rounded p-3 text-xs text-destructive font-mono">
+          <div className="border border-destructive/40 rounded p-3 text-xs text-destructive font-mono whitespace-pre-wrap">
             Fehler: {error}
           </div>
         )}
