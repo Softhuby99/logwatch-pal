@@ -1010,35 +1010,11 @@ app.post("/api/setup/ssh-test", async (req, res) => {
 // 503 with a helpful message instead of crashing.
 // ─────────────────────────────────────────────────────────────
 
-// shared HTTPS agent that ignores self-signed certs when the corresponding
-// _INSECURE_TLS flag is "1" (typical for internal appliances).
-const insecureAgent = new https.Agent({ rejectUnauthorized: false });
+// shared insecureAgent / http helpers are defined further up in this file
+// (see ~line 724). We reuse them here.
 
-function pickAgent(url, insecure) {
-  if (!url) return undefined;
-  if (url.startsWith("https://") && insecure) return insecureAgent;
-  return undefined;
-}
-
-async function jsonFetch(url, opts = {}, { insecure = false, timeoutMs = 8000 } = {}) {
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), timeoutMs);
-  try {
-    const res = await fetch(url, {
-      ...opts,
-      signal: ctrl.signal,
-      // @ts-ignore – node fetch supports `agent` via undici dispatcher; for
-      // self-signed we fall back to https.request below if needed.
-    });
-    return res;
-  } finally {
-    clearTimeout(t);
-  }
-}
-
-// Low-level https request that supports the insecure agent (node fetch in
-// node 20 does not honor a custom https.Agent reliably across versions).
-function httpsRequest(targetUrl, { method = "GET", headers = {}, body, insecure = false, timeoutMs = 8000 } = {}) {
+// Low-level https request that supports a body and self-signed certs.
+function intHttpRequest(targetUrl, { method = "GET", headers = {}, body, insecure = false, timeoutMs = 8000 } = {}) {
   return new Promise((resolve, reject) => {
     let u;
     try { u = new URL(targetUrl); } catch (e) { return reject(e); }
