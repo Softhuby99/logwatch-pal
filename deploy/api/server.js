@@ -5,6 +5,7 @@
 import express from "express";
 import cors from "cors";
 import mysql from "mysql2/promise";
+import { spawn } from "child_process";
 
 const app = express();
 app.use(cors());
@@ -467,6 +468,82 @@ app.get("/api/geo-attacks", async (_req, res) => {
     console.error("GET /api/geo-attacks error:", err);
     res.status(500).json({ error: err.message });
   }
+});
+
+// ── Tools / Manual scripts ──────────────────────────────────
+// Whitelist of scripts that can be triggered from the dashboard.
+// Each entry is run from COLLECTOR_ROOT (default /opt/logserver/collector)
+// using the configured Python interpreter.
+const COLLECTOR_ROOT = process.env.COLLECTOR_ROOT || "/opt/logserver/collector";
+const COLLECTOR_PY = process.env.COLLECTOR_PY || `${COLLECTOR_ROOT}/venv/bin/python3`;
+
+const TOOL_SCRIPTS = {
+  ip_enricher: {
+    label: "IP Enricher (GeoIP / ASN nachladen)",
+    args: ["-m", "src.metrics.ip_enricher"],
+    description:
+      "Lädt fehlende GeoIP-, ASN- und Org-Infos für IPs in ip_enrichment nach.",
+  },
+  risk_score: {
+    label: "Risk-Score neu berechnen",
+    args: ["-m", "src.metrics.risk_score"],
+    description: "Berechnet den Risiko-Score für alle bekannten IPs neu.",
+  },
+  ip_summary: {
+    label: "IP-Summary aktualisieren",
+    args: ["-m", "src.metrics.ip_summary"],
+    description: "Aktualisiert die ip_summary-Aggregat-Tabelle.",
+  },
+};
+
+app.get("/api/tools", (_req, res) => {
+  res.json(
+    Object.entries(TOOL_SCRIPTS).map(([id, s]) => ({
+      id,
+      label: s.label,
+      description: s.description,
+    }))
+  );
+});
+
+app.post("/api/tools/run", (req, res) => {
+  const id = String(req.body?.id || "");
+  const tool = TOOL_SCRIPTS[id];
+  if (!tool) return res.status(400).json({ error: "Unbekanntes Tool" });
+
+  const child = spawn(COLLECTOR_PY, tool.args, {
+    cwd: COLLECTOR_ROOT,
+    env: { ...process.env, PYTHONPATH: COLLECTOR_ROOT },
+  });
+
+  let stdout = "";
+  let stderr = "";
+  let finished = false;
+
+  const timeout = setTimeout(() => {
+    if (!finished) {
+      try { child.kill("SIGKILL"); } catch { /* */ }
+    }
+  }, 120_000);
+
+  child.stdout.on("data", (d) => { stdout += d.toString(); });
+  child.stderr.on("data", (d) => { stderr += d.toString(); });
+  child.on("error", (err) => {
+    finished = true;
+    clearTimeout(timeout);
+    res.status(500).json({ error: err.message, stdout, stderr });
+  });
+  child.on("close", (code) => {
+    finished = true;
+    clearTimeout(timeout);
+    res.json({
+      id,
+      exit_code: code,
+      ok: code === 0,
+      stdout: stdout.slice(-8000),
+      stderr: stderr.slice(-8000),
+    });
+  });
 });
 
 // ── Start ────────────────────────────────────────────────────
