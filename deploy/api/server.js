@@ -350,6 +350,97 @@ app.get("/api/auth-timeline", async (_req, res) => {
   }
 });
 
+// ── Auth events for one hour bucket (last 24h) ──────────────
+// Query: ?hour=HH:00 [&type=smtp|imap]
+app.get("/api/auth-events/by-hour", async (req, res) => {
+  try {
+    const hour = String(req.query.hour || "");
+    if (!/^\d{2}:00$/.test(hour)) {
+      return res.status(400).json({ error: "hour must be HH:00" });
+    }
+    const type = String(req.query.type || "all");
+    let typeFilter = "";
+    if (type === "smtp") typeFilter = "AND login_type = 'smtp'";
+    else if (type === "imap") typeFilter = "AND login_type IN ('imap','pop3')";
+
+    const [events] = await pool.query(
+      `SELECT * FROM auth_events
+       WHERE auth_status = 'failed'
+         AND event_time > NOW() - INTERVAL 24 HOUR
+         AND DATE_FORMAT(event_time, '%H:00') = ?
+         ${typeFilter}
+       ORDER BY event_time DESC
+       LIMIT 500`,
+      [hour]
+    );
+    const byIp = {};
+    for (const e of events) {
+      const ip = e.ip || "unknown";
+      if (!byIp[ip]) byIp[ip] = { ip, count: 0, last_seen: e.event_time, login_types: new Set(), users: new Set() };
+      byIp[ip].count++;
+      if (e.login_type) byIp[ip].login_types.add(e.login_type);
+      if (e.username) byIp[ip].users.add(e.username);
+    }
+    const ips = Object.values(byIp).map(r => ({
+      ip: r.ip,
+      count: r.count,
+      last_seen: r.last_seen,
+      login_types: [...r.login_types],
+      users: [...r.users].slice(0, 5),
+    })).sort((a, b) => b.count - a.count);
+    res.json({ hour, type, events, by_ip: ips });
+  } catch (err) {
+    console.error("GET /api/auth-events/by-hour error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Security events by source (Postfix/Netfilter/Dovecot/CrowdSec) ──
+// Query: ?source=postfix|netfilter|dovecot|crowdsec [&window=24h|7d|30d]
+app.get("/api/security-events/by-source", async (req, res) => {
+  try {
+    const source = String(req.query.source || "").toLowerCase();
+    const window = String(req.query.window || "24h");
+    const allowed = ["postfix", "netfilter", "dovecot", "crowdsec"];
+    if (!allowed.includes(source)) {
+      return res.status(400).json({ error: "invalid source" });
+    }
+    const intervalSql =
+      window === "7d" ? "INTERVAL 7 DAY"
+      : window === "30d" ? "INTERVAL 30 DAY"
+      : "INTERVAL 24 HOUR";
+
+    const where = source === "crowdsec"
+      ? `(source_component = 'crowdsec' OR source_system = 'opnsense')`
+      : `source_component = '${source}'`;
+
+    const [events] = await pool.query(
+      `SELECT * FROM security_events
+       WHERE ${where}
+         AND event_time > NOW() - ${intervalSql}
+       ORDER BY event_time DESC
+       LIMIT 500`
+    );
+    const byIp = {};
+    for (const e of events) {
+      const ip = e.ip || "unknown";
+      if (!byIp[ip]) byIp[ip] = { ip, count: 0, last_seen: e.event_time, types: new Set() };
+      byIp[ip].count++;
+      if (e.event_type) byIp[ip].types.add(e.event_type);
+    }
+    const ips = Object.values(byIp).map(r => ({
+      ip: r.ip,
+      count: r.count,
+      last_seen: r.last_seen,
+      types: [...r.types].slice(0, 5),
+    })).sort((a, b) => b.count - a.count);
+    res.json({ source, window, events, by_ip: ips });
+  } catch (err) {
+    console.error("GET /api/security-events/by-source error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Events by Source ────────────────────────────────────────
 app.get("/api/events-by-source", async (_req, res) => {
   try {
