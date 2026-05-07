@@ -940,4 +940,18 @@ app.post("/api/setup/ssh-test", async (req, res) => {
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Dashboard API listening on :${PORT}`);
+  console.log(
+    `[startup] MariaDB target: ${process.env.MARIADB_USER || "loguser"}@${process.env.MARIADB_HOST || "host.docker.internal"}:${process.env.MARIADB_PORT || "3306"}/${process.env.MARIADB_DATABASE || "logdb"}`
+  );
+  // Probe DB once at boot so the real error (auth, host, port, db missing) is
+  // visible in `docker compose logs api` instead of surfacing only on first
+  // request as an opaque 502.
+  pool.query("SELECT 1")
+    .then(() => console.log("[startup] DB connection OK"))
+    .catch((err) => console.error("[startup] DB connection FAILED:", err.code || err.message));
 });
+
+// Catch unhandled errors so the process logs them instead of dying silently.
+process.on("unhandledRejection", (e) => console.error("[unhandledRejection]", e));
+process.on("uncaughtException", (e) => console.error("[uncaughtException]", e));
+
