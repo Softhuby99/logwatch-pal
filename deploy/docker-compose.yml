@@ -215,5 +215,4 @@ volumes:
 
 networks:
   default:
-  shared-db:
-    external: true
+
