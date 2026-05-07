@@ -18,7 +18,7 @@ const AuthTimeline = () => {
     [],
     30_000
   );
-  const chartData = data ?? authFailureTimeline;
+  const chartData = data && data.length > 0 ? data : authFailureTimeline;
 
   const [sheet, setSheet] = useState<{ open: boolean; hour: string | null }>({
     open: false,
