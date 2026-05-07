@@ -217,4 +217,7 @@ volumes:
 
 networks:
   default:
+  logdb_net:
+    name: ${LOGDB_NETWORK:-logserver_default}
+    external: true
 
