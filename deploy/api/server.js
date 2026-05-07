@@ -816,9 +816,26 @@ async function checkCrowdsec() {
 
 async function checkCollectorHeartbeat() {
   try {
-    const [[r]] = await pool.query("SELECT MAX(event_time) as last FROM security_events");
-    if (!r.last) return { id: "collector", label: "Log-Collector Heartbeat", status: "warn", detail: "Keine Events in DB" };
-    const ageMin = Math.round((Date.now() - new Date(r.last).getTime()) / 60000);
+    // Compute the age in MariaDB itself to avoid timezone mismatches between
+    // the DB server and the API container (mysql2 returns DATETIME as JS Date
+    // using the connection's timezone, which can be off by hours).
+    // Take the freshest event across the tables the collector writes into.
+    const [[r]] = await pool.query(`
+      SELECT
+        GREATEST(
+          COALESCE((SELECT MAX(event_time) FROM security_events), '1970-01-01'),
+          COALESCE((SELECT MAX(event_time) FROM auth_events),     '1970-01-01')
+        ) AS last,
+        TIMESTAMPDIFF(MINUTE,
+          GREATEST(
+            COALESCE((SELECT MAX(event_time) FROM security_events), '1970-01-01'),
+            COALESCE((SELECT MAX(event_time) FROM auth_events),     '1970-01-01')
+          ), NOW()) AS age_min
+    `);
+    if (!r.last || String(r.last).startsWith("1970")) {
+      return { id: "collector", label: "Log-Collector Heartbeat", status: "warn", detail: "Keine Events in DB" };
+    }
+    const ageMin = Number(r.age_min);
     const status = ageMin < 15 ? "ok" : ageMin < 60 ? "warn" : "error";
     return { id: "collector", label: "Log-Collector Heartbeat", status, detail: `Letztes Event vor ${ageMin} min` };
   } catch (e) {
