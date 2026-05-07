@@ -5,12 +5,56 @@
 import express from "express";
 import cors from "cors";
 import mysql from "mysql2/promise";
-import { spawn } from "child_process";
+import { spawn, spawnSync } from "child_process";
 import path from "path";
+import fs from "fs";
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// ── SSH key bootstrap ────────────────────────────────────────
+// Auto-generate an ed25519 keypair on first start so the dashboard can
+// connect to remote hosts (OPNsense, Mailcow, PMG, …) for status checks.
+// Key lives in the api_ssh docker volume mounted at /home/node/.ssh.
+const SSH_DIR = process.env.SSH_KEY_DIR || "/home/node/.ssh";
+const SSH_KEY_NAME = process.env.SSH_KEY_NAME || "id_ed25519_dashboard";
+const SSH_KEY_PATH = path.join(SSH_DIR, SSH_KEY_NAME);
+const SSH_PUB_PATH = `${SSH_KEY_PATH}.pub`;
+
+function ensureSshKey() {
+  try {
+    if (!fs.existsSync(SSH_DIR)) fs.mkdirSync(SSH_DIR, { recursive: true, mode: 0o700 });
+    try { fs.chmodSync(SSH_DIR, 0o700); } catch {}
+    if (!fs.existsSync(SSH_KEY_PATH)) {
+      const r = spawnSync("ssh-keygen", [
+        "-t", "ed25519",
+        "-N", "",
+        "-C", "dashboard@api",
+        "-f", SSH_KEY_PATH,
+      ], { stdio: "inherit" });
+      if (r.status !== 0) {
+        console.error("[ssh] ssh-keygen failed", r.error || `exit ${r.status}`);
+        return;
+      }
+      console.log(`[ssh] generated key ${SSH_KEY_PATH}`);
+    }
+    try { fs.chmodSync(SSH_KEY_PATH, 0o600); } catch {}
+  } catch (e) {
+    console.error("[ssh] key bootstrap failed:", e.message);
+  }
+}
+ensureSshKey();
+
+// Expose public key so the user can copy it into authorized_keys on targets.
+app.get("/api/ssh/pubkey", (_req, res) => {
+  try {
+    if (!fs.existsSync(SSH_PUB_PATH)) return res.status(404).json({ error: "pubkey not yet generated" });
+    res.type("text/plain").send(fs.readFileSync(SSH_PUB_PATH, "utf8"));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
 // ── DB pool ──────────────────────────────────────────────────
 const pool = mysql.createPool({
