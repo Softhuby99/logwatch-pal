@@ -790,13 +790,13 @@ async function checkOpnsense() {
 }
 
 async function checkMailcow() {
-  const url = process.env.MAILCOW_URL;
+  const url = process.env.MAILCOW_HOST || process.env.MAILCOW_URL;
   const key = process.env.MAILCOW_API_KEY;
-  if (!url) return { id: "mailcow", label: "Mailcow", status: "skip", detail: "Nicht konfiguriert (MAILCOW_URL)" };
+  if (!url) return { id: "mailcow", label: "Mailcow", status: "skip", detail: "Nicht konfiguriert (MAILCOW_HOST)" };
   const t0 = Date.now();
   try {
     const r = await httpJson(`${url.replace(/\/$/, "")}/api/v1/get/status/containers`, {
-      headers: { "X-API-Key": key || "" }, insecure: process.env.MAILCOW_INSECURE === "1",
+      headers: { "X-API-Key": key || "" }, insecure: process.env.MAILCOW_INSECURE_TLS === "1" || process.env.MAILCOW_INSECURE === "1",
     });
     let detail = `HTTP ${r.status}`;
     if (r.status === 200) {
