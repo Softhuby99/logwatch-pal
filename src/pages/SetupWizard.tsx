@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowRight,
@@ -10,6 +10,11 @@ import {
   KeyRound,
   Download,
   Check,
+  Terminal,
+  Loader2,
+  Copy,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +23,8 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+
+const API_BASE = (import.meta.env.VITE_API_URL as string | undefined) || "/api";
 
 interface WizardState {
   // Server users
@@ -76,6 +83,7 @@ const STEPS = [
   { id: "db", label: "Datenbank", icon: Database },
   { id: "backup", label: "Backup & Cron", icon: HardDrive },
   { id: "web", label: "Web / TLS", icon: ShieldCheck },
+  { id: "ssh", label: "SSH-Targets", icon: Terminal },
   { id: "sso", label: "SSO (Authentik)", icon: KeyRound },
   { id: "review", label: "Übersicht", icon: Check },
 ] as const;
@@ -229,6 +237,8 @@ export default function SetupWizard() {
           </div>
         )}
 
+        {Current.id === "ssh" && <SshWizardStep />}
+
         {Current.id === "sso" && (
           <div className="grid gap-4 md:grid-cols-2">
             <div className="md:col-span-2">
@@ -341,6 +351,229 @@ function Toggle({
       <div className="space-y-0.5">
         <Label className="cursor-pointer">{label}</Label>
         {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+      </div>
+    </div>
+  );
+}
+
+// ── SSH Wizard Step ─────────────────────────────────────────
+interface SshTarget {
+  id: string;
+  label: string;
+  host: string;
+  user: string;
+  port: number;
+  result?: {
+    ok: boolean;
+    latency_ms?: number;
+    stdout?: string;
+    stderr?: string;
+    hint?: string;
+    error?: string;
+  };
+  testing?: boolean;
+}
+
+const DEFAULT_TARGETS: SshTarget[] = [
+  { id: "opnsense", label: "OPNsense", host: "", user: "root", port: 22 },
+  { id: "mailcow", label: "Mailcow Host", host: "", user: "root", port: 22 },
+];
+
+function SshWizardStep() {
+  const [pubkey, setPubkey] = useState<string>("");
+  const [pubkeyExists, setPubkeyExists] = useState<boolean | null>(null);
+  const [keyPath, setKeyPath] = useState<string>("");
+  const [generating, setGenerating] = useState(false);
+  const [comment, setComment] = useState("dashboard@logsrv");
+  const [targets, setTargets] = useState<SshTarget[]>(() => {
+    try {
+      const raw = localStorage.getItem("setup.sshTargets");
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return DEFAULT_TARGETS;
+  });
+
+  useEffect(() => {
+    fetch(`${API_BASE}/setup/ssh-pubkey`)
+      .then(r => r.json())
+      .then(j => {
+        setPubkeyExists(!!j.exists);
+        setKeyPath(j.path || "");
+        if (j.public_key) setPubkey(j.public_key);
+      })
+      .catch(() => setPubkeyExists(false));
+  }, []);
+
+  useEffect(() => {
+    try { localStorage.setItem("setup.sshTargets", JSON.stringify(targets.map(t => ({ ...t, result: undefined, testing: undefined })))); } catch {}
+  }, [targets]);
+
+  const generate = async (overwrite = false) => {
+    setGenerating(true);
+    try {
+      const r = await fetch(`${API_BASE}/setup/ssh-keygen`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ comment, overwrite }),
+      });
+      const j = await r.json();
+      if (j.public_key) {
+        setPubkey(j.public_key);
+        setPubkeyExists(true);
+        setKeyPath(j.path);
+        toast.success(j.created ? "SSH-Key erzeugt" : "SSH-Key existiert bereits");
+      } else {
+        toast.error(j.error || "Fehler beim Erzeugen");
+      }
+    } catch (e: any) {
+      toast.error(e.message || "Netzwerkfehler – läuft die API?");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const copyKey = () => {
+    navigator.clipboard.writeText(pubkey);
+    toast.success("Public Key kopiert");
+  };
+
+  const testTarget = async (id: string) => {
+    setTargets(ts => ts.map(t => t.id === id ? { ...t, testing: true, result: undefined } : t));
+    const t = targets.find(x => x.id === id)!;
+    try {
+      const r = await fetch(`${API_BASE}/setup/ssh-test`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ host: t.host, user: t.user, port: t.port }),
+      });
+      const j = await r.json();
+      setTargets(ts => ts.map(x => x.id === id ? { ...x, testing: false, result: j } : x));
+    } catch (e: any) {
+      setTargets(ts => ts.map(x => x.id === id ? { ...x, testing: false, result: { ok: false, error: e.message } } : x));
+    }
+  };
+
+  const updateTarget = (id: string, patch: Partial<SshTarget>) =>
+    setTargets(ts => ts.map(t => t.id === id ? { ...t, ...patch, result: undefined } : t));
+
+  const addTarget = () =>
+    setTargets(ts => [...ts, { id: `t${Date.now()}`, label: "Neues Ziel", host: "", user: "root", port: 22 }]);
+
+  const removeTarget = (id: string) =>
+    setTargets(ts => ts.filter(t => t.id !== id));
+
+  return (
+    <div className="space-y-5">
+      <div className="rounded-md border border-border bg-background p-4 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-sm font-medium flex items-center gap-2">
+            <KeyRound className="h-4 w-4 text-primary" /> Dashboard SSH-Key
+          </h3>
+          {pubkeyExists === true && <span className="text-xs text-green-500 font-mono">vorhanden</span>}
+          {pubkeyExists === false && <span className="text-xs text-muted-foreground font-mono">noch nicht erzeugt</span>}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Wird im API-Container unter <code className="rounded bg-muted px-1 text-[11px]">{keyPath || "/home/node/.ssh/id_ed25519_dashboard"}</code> abgelegt
+          (persistentes Volume <code className="rounded bg-muted px-1 text-[11px]">api_ssh</code>).
+        </p>
+
+        {!pubkeyExists && (
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="flex-1 min-w-[200px] space-y-1">
+              <Label className="text-xs">Key-Kommentar</Label>
+              <Input value={comment} onChange={e => setComment(e.target.value)} className="h-8 text-xs" />
+            </div>
+            <Button onClick={() => generate(false)} disabled={generating} size="sm" className="gap-2">
+              {generating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <KeyRound className="h-3.5 w-3.5" />}
+              ED25519-Keypair erzeugen
+            </Button>
+          </div>
+        )}
+
+        {pubkey && (
+          <>
+            <div className="rounded border border-border/50 bg-card p-2 font-mono text-[11px] break-all">
+              {pubkey}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={copyKey} size="sm" variant="outline" className="gap-1.5">
+                <Copy className="h-3.5 w-3.5" /> Public Key kopieren
+              </Button>
+              <Button onClick={() => generate(true)} size="sm" variant="ghost" disabled={generating} className="gap-1.5 text-destructive">
+                {generating && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Neu erzeugen (überschreiben)
+              </Button>
+            </div>
+            <details className="text-xs text-muted-foreground">
+              <summary className="cursor-pointer hover:text-foreground">Anleitung: Public Key auf Ziel-Host installieren</summary>
+              <div className="mt-2 space-y-2 pl-2 border-l-2 border-border">
+                <div>
+                  <strong className="text-foreground">Linux (ssh-copy-id):</strong>
+                  <pre className="mt-1 rounded bg-muted/60 p-2 font-mono text-[10px] overflow-x-auto">echo '{pubkey.split(" ").slice(0,2).join(" ")}...' | ssh root@HOST "mkdir -p ~/.ssh && cat &gt;&gt; ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"</pre>
+                </div>
+                <div>
+                  <strong className="text-foreground">OPNsense:</strong> System → Access → Users → root → "authorized SSH keys" → Public Key einfügen.
+                </div>
+                <div>
+                  <strong className="text-foreground">Mailcow Host:</strong> normalen User-Account, Public Key in <code>~/.ssh/authorized_keys</code>. Empfohlen: dedizierter User <code>logread</code> mit nur-lese-Sudo für <code>/var/log</code>.
+                </div>
+              </div>
+            </details>
+          </>
+        )}
+      </div>
+
+      <Separator />
+
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-medium">SSH-Verbindungen testen</h3>
+          <Button onClick={addTarget} size="sm" variant="outline" className="gap-1.5 h-7 text-xs">
+            <Plus className="h-3 w-3" /> Ziel hinzufügen
+          </Button>
+        </div>
+
+        {targets.map(t => (
+          <div key={t.id} className="rounded-md border border-border bg-background p-3 space-y-2">
+            <div className="grid gap-2 sm:grid-cols-12">
+              <Input className="sm:col-span-3 h-8 text-xs" value={t.label} onChange={e => updateTarget(t.id, { label: e.target.value })} placeholder="Label" />
+              <Input className="sm:col-span-4 h-8 text-xs font-mono" value={t.host} onChange={e => updateTarget(t.id, { host: e.target.value })} placeholder="host.example.com" />
+              <Input className="sm:col-span-2 h-8 text-xs font-mono" value={t.user} onChange={e => updateTarget(t.id, { user: e.target.value })} placeholder="user" />
+              <Input className="sm:col-span-1 h-8 text-xs font-mono" type="number" value={t.port} onChange={e => updateTarget(t.id, { port: parseInt(e.target.value) || 22 })} />
+              <div className="sm:col-span-2 flex gap-1">
+                <Button size="sm" className="flex-1 h-8 text-xs gap-1" disabled={!t.host || t.testing || !pubkeyExists} onClick={() => testTarget(t.id)}>
+                  {t.testing ? <Loader2 className="h-3 w-3 animate-spin" /> : "Test"}
+                </Button>
+                <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive" onClick={() => removeTarget(t.id)}>
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+            {t.result && (
+              <div className={`rounded border px-2 py-1.5 text-[11px] font-mono whitespace-pre-wrap break-all ${
+                t.result.ok ? "border-green-500/40 bg-green-500/5 text-green-600" : "border-destructive/40 bg-destructive/5 text-destructive"
+              }`}>
+                {t.result.ok
+                  ? `✓ verbunden (${t.result.latency_ms}ms): ${t.result.stdout || "ok"}`
+                  : `✗ ${t.result.error || t.result.stderr || "Fehler"}${t.result.hint ? `\n→ ${t.result.hint}` : ""}`}
+              </div>
+            )}
+          </div>
+        ))}
+
+        {!pubkeyExists && (
+          <p className="text-xs text-muted-foreground">
+            Erst SSH-Key erzeugen, dann sind die Tests aktiv.
+          </p>
+        )}
+      </div>
+
+      <div className="rounded-md border border-border/50 bg-muted/30 p-3 text-xs text-muted-foreground space-y-1">
+        <p><strong className="text-foreground">Empfohlene Rechte auf dem Zielsystem:</strong></p>
+        <ul className="list-disc pl-4 space-y-0.5">
+          <li>Eigener User <code>logread</code> (kein Login-Shell nötig: <code>/usr/sbin/nologin</code> ist ok für Datei-Reads via <code>scp</code>).</li>
+          <li>Lesezugriff auf <code>/var/log</code> via Gruppe <code>adm</code>: <code>usermod -aG adm logread</code></li>
+          <li>Optional eingeschränktes <code>sudo</code> (nur lesen): <code>logread ALL=(root) NOPASSWD: /usr/bin/tail, /usr/bin/cat, /bin/journalctl</code></li>
+        </ul>
       </div>
     </div>
   );

@@ -61,8 +61,16 @@ export const DrilldownSheet = ({ open, onOpenChange, title, subtitle, endpoint }
     setError(null);
     setData(null);
     fetch(`${API_BASE}${endpoint}`, { cache: "no-store" })
-      .then(r => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      .then(async r => {
+        if (!r.ok) {
+          const txt = await r.text().catch(() => "");
+          if (r.status === 404) {
+            throw new Error(
+              `Endpoint nicht gefunden (HTTP 404).\nDer API-Container kennt diese Route noch nicht – bitte neu bauen:\n  cd /opt/logserver/deploy && docker compose build api && docker compose up -d api`
+            );
+          }
+          throw new Error(`HTTP ${r.status}${txt ? ` · ${txt.slice(0, 200)}` : ""}`);
+        }
         return r.json();
       })
       .then(j => { if (!cancelled) setData(j); })
@@ -97,7 +105,7 @@ export const DrilldownSheet = ({ open, onOpenChange, title, subtitle, endpoint }
           </div>
         )}
         {error && (
-          <div className="border border-destructive/40 rounded p-3 text-xs text-destructive font-mono">
+          <div className="border border-destructive/40 rounded p-3 text-xs text-destructive font-mono whitespace-pre-wrap">
             Fehler: {error}
           </div>
         )}
