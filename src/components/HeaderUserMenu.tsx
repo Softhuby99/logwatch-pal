@@ -1,5 +1,7 @@
-import { Activity, LogOut, User as UserIcon } from "lucide-react";
+import { useState } from "react";
+import { Activity, Info, LogOut, RefreshCw, Settings2, User as UserIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,6 +13,9 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useApiLive } from "@/contexts/ApiLiveContext";
+import { useRefreshSettings } from "@/contexts/RefreshSettingsContext";
+import { ToolsDialog } from "@/components/ToolsDialog";
+import { InfoDialog } from "@/components/InfoDialog";
 
 const initialsOf = (name: string) =>
   name
@@ -23,9 +28,30 @@ const initialsOf = (name: string) =>
 export const HeaderUserMenu = () => {
   const { user, logout } = useAuth();
   const { live } = useApiLive();
+  const { triggerRefresh, refreshMs } = useRefreshSettings();
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
+  const [spinning, setSpinning] = useState(false);
+
+  const handleRefresh = () => {
+    triggerRefresh();
+    setSpinning(true);
+    window.setTimeout(() => setSpinning(false), 700);
+  };
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-2">
+      {/* Manual refresh */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-7 w-7"
+        title={`Jetzt aktualisieren (Auto: ${Math.round(refreshMs / 1000)}s)`}
+        onClick={handleRefresh}
+      >
+        <RefreshCw className={`h-3.5 w-3.5 ${spinning ? "animate-spin" : ""}`} />
+      </Button>
+
       {/* Live / Demo Indicator */}
       {live ? (
         <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-400 border-emerald-500/30 gap-1">
@@ -65,6 +91,15 @@ export const HeaderUserMenu = () => {
               <UserIcon className="mr-2 h-4 w-4" />
               Profil
             </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setToolsOpen(true)} className="cursor-pointer">
+              <Settings2 className="mr-2 h-4 w-4" />
+              Tools &amp; Einstellungen
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setInfoOpen(true)} className="cursor-pointer">
+              <Info className="mr-2 h-4 w-4" />
+              Info &amp; Glossar
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={() => logout()}
               className="text-red-400 focus:text-red-400 focus:bg-red-500/10 cursor-pointer"
@@ -75,6 +110,9 @@ export const HeaderUserMenu = () => {
           </DropdownMenuContent>
         </DropdownMenu>
       ) : null}
+
+      <ToolsDialog open={toolsOpen} onOpenChange={setToolsOpen} />
+      <InfoDialog open={infoOpen} onOpenChange={setInfoOpen} />
     </div>
   );
 };
