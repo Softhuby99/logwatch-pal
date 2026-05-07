@@ -237,6 +237,8 @@ export default function SetupWizard() {
           </div>
         )}
 
+        {Current.id === "ssh" && <SshWizardStep />}
+
         {Current.id === "sso" && (
           <div className="grid gap-4 md:grid-cols-2">
             <div className="md:col-span-2">
