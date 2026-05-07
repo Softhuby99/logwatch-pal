@@ -33,7 +33,20 @@ export const HeaderUserMenu = () => {
   const { triggerRefresh, refreshMs } = useRefreshSettings();
   const [toolsOpen, setToolsOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
+  const [statusOpen, setStatusOpen] = useState(false);
+  const [overall, setOverall] = useState<HealthResponse["overall"] | null>(null);
   const [spinning, setSpinning] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const tick = async () => {
+      const { data, live } = await fetchHealthChecks({ overall: "warn", checked_at: "", checks: [] });
+      if (!cancelled) setOverall(live ? data.overall : null);
+    };
+    tick();
+    const t = setInterval(tick, 60_000);
+    return () => { cancelled = true; clearInterval(t); };
+  }, []);
 
   const handleRefresh = () => {
     triggerRefresh();
