@@ -98,3 +98,20 @@ export const fetchIpEvents = <T>(ip: string, fallback: T) =>
 
 export const fetchIpDaily = <T>(ip: string, fallback: T[]) =>
   apiFetch<T[]>(`/ip/${ip}/daily`, fallback);
+
+export interface HealthCheck {
+  id: string;
+  label: string;
+  status: "ok" | "warn" | "error" | "skip";
+  latency_ms?: number;
+  detail?: string;
+  children?: { target: string; ok: boolean; latency_ms: number; detail: string }[];
+}
+export interface HealthResponse {
+  overall: "ok" | "warn" | "error";
+  checked_at: string;
+  cached?: boolean;
+  checks: HealthCheck[];
+}
+export const fetchHealthChecks = (fallback: HealthResponse) =>
+  apiFetch<HealthResponse>("/health/checks", fallback);

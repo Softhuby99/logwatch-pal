@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Activity, Info, LogOut, RefreshCw, Settings2, User as UserIcon } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Activity, Heart, Info, LogOut, RefreshCw, Settings2, User as UserIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,6 +16,8 @@ import { useApiLive } from "@/contexts/ApiLiveContext";
 import { useRefreshSettings } from "@/contexts/RefreshSettingsContext";
 import { ToolsDialog } from "@/components/ToolsDialog";
 import { InfoDialog } from "@/components/InfoDialog";
+import { SystemStatusDialog } from "@/components/SystemStatusDialog";
+import { fetchHealthChecks, type HealthResponse } from "@/lib/api";
 
 const initialsOf = (name: string) =>
   name
@@ -31,7 +33,20 @@ export const HeaderUserMenu = () => {
   const { triggerRefresh, refreshMs } = useRefreshSettings();
   const [toolsOpen, setToolsOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
+  const [statusOpen, setStatusOpen] = useState(false);
+  const [overall, setOverall] = useState<HealthResponse["overall"] | null>(null);
   const [spinning, setSpinning] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const tick = async () => {
+      const { data, live } = await fetchHealthChecks({ overall: "warn", checked_at: "", checks: [] });
+      if (!cancelled) setOverall(live ? data.overall : null);
+    };
+    tick();
+    const t = setInterval(tick, 60_000);
+    return () => { cancelled = true; clearInterval(t); };
+  }, []);
 
   const handleRefresh = () => {
     triggerRefresh();
@@ -50,6 +65,25 @@ export const HeaderUserMenu = () => {
         onClick={handleRefresh}
       >
         <RefreshCw className={`h-3.5 w-3.5 ${spinning ? "animate-spin" : ""}`} />
+      </Button>
+
+      {/* System Status dot */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-7 w-7 relative"
+        title="System Status"
+        onClick={() => setStatusOpen(true)}
+      >
+        <Heart className="h-3.5 w-3.5" />
+        <span
+          className={`absolute top-1 right-1 h-1.5 w-1.5 rounded-full ${
+            overall === "ok" ? "bg-emerald-400"
+            : overall === "warn" ? "bg-amber-400"
+            : overall === "error" ? "bg-red-400 animate-pulse"
+            : "bg-muted-foreground/40"
+          }`}
+        />
       </Button>
 
       {/* Live / Demo Indicator */}
@@ -95,6 +129,10 @@ export const HeaderUserMenu = () => {
               <Settings2 className="mr-2 h-4 w-4" />
               Tools &amp; Einstellungen
             </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setStatusOpen(true)} className="cursor-pointer">
+              <Heart className="mr-2 h-4 w-4" />
+              System Status
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setInfoOpen(true)} className="cursor-pointer">
               <Info className="mr-2 h-4 w-4" />
               Info &amp; Glossar
@@ -113,6 +151,7 @@ export const HeaderUserMenu = () => {
 
       <ToolsDialog open={toolsOpen} onOpenChange={setToolsOpen} />
       <InfoDialog open={infoOpen} onOpenChange={setInfoOpen} />
+      <SystemStatusDialog open={statusOpen} onOpenChange={setStatusOpen} />
     </div>
   );
 };

@@ -663,6 +663,199 @@ app.post("/api/tools/run", (req, res) => {
   });
 });
 
+// ── System Status / Health Checks ────────────────────────────
+import os from "os";
+import fs from "fs";
+import https from "https";
+import http from "http";
+import { execFile } from "child_process";
+
+const insecureAgent = new https.Agent({ rejectUnauthorized: false });
+
+function httpJson(url, { headers = {}, timeoutMs = 5000, insecure = false } = {}) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(url);
+    const lib = u.protocol === "https:" ? https : http;
+    const req = lib.request(
+      url,
+      {
+        method: "GET",
+        headers,
+        timeout: timeoutMs,
+        agent: u.protocol === "https:" && insecure ? insecureAgent : undefined,
+      },
+      (res) => {
+        let buf = "";
+        res.on("data", (c) => (buf += c));
+        res.on("end", () => resolve({ status: res.statusCode, body: buf }));
+      }
+    );
+    req.on("timeout", () => { req.destroy(new Error("timeout")); });
+    req.on("error", reject);
+    req.end();
+  });
+}
+
+async function checkDatabase() {
+  const t0 = Date.now();
+  try {
+    const [[r]] = await pool.query("SELECT 1 as ok");
+    const [[c]] = await pool.query("SELECT COUNT(*) as n FROM security_events WHERE event_time > NOW() - INTERVAL 1 HOUR");
+    return {
+      id: "database", label: "MariaDB / logdb",
+      status: r.ok === 1 ? "ok" : "warn",
+      latency_ms: Date.now() - t0,
+      detail: `Verbindung OK · ${c.n} Events in letzter Stunde`,
+    };
+  } catch (e) {
+    return { id: "database", label: "MariaDB / logdb", status: "error", latency_ms: Date.now() - t0, detail: e.message };
+  }
+}
+
+async function checkApi() {
+  return { id: "api", label: "Dashboard API", status: "ok", latency_ms: 0, detail: `Node ${process.version} · uptime ${Math.round(process.uptime())}s` };
+}
+
+async function checkOpnsense() {
+  const url = process.env.OPNSENSE_URL;
+  const key = process.env.OPNSENSE_KEY;
+  const sec = process.env.OPNSENSE_SECRET;
+  if (!url) return { id: "opnsense", label: "OPNsense", status: "skip", detail: "Nicht konfiguriert (OPNSENSE_URL)" };
+  const t0 = Date.now();
+  try {
+    const auth = "Basic " + Buffer.from(`${key}:${sec}`).toString("base64");
+    const r = await httpJson(`${url.replace(/\/$/, "")}/api/core/firmware/status`, {
+      headers: { Authorization: auth }, insecure: process.env.OPNSENSE_INSECURE === "1",
+    });
+    return {
+      id: "opnsense", label: "OPNsense",
+      status: r.status >= 200 && r.status < 300 ? "ok" : "error",
+      latency_ms: Date.now() - t0,
+      detail: `HTTP ${r.status}`,
+    };
+  } catch (e) {
+    return { id: "opnsense", label: "OPNsense", status: "error", latency_ms: Date.now() - t0, detail: e.message };
+  }
+}
+
+async function checkMailcow() {
+  const url = process.env.MAILCOW_URL;
+  const key = process.env.MAILCOW_API_KEY;
+  if (!url) return { id: "mailcow", label: "Mailcow", status: "skip", detail: "Nicht konfiguriert (MAILCOW_URL)" };
+  const t0 = Date.now();
+  try {
+    const r = await httpJson(`${url.replace(/\/$/, "")}/api/v1/get/status/containers`, {
+      headers: { "X-API-Key": key || "" }, insecure: process.env.MAILCOW_INSECURE === "1",
+    });
+    let detail = `HTTP ${r.status}`;
+    if (r.status === 200) {
+      try {
+        const j = JSON.parse(r.body);
+        const total = Object.keys(j).length;
+        const running = Object.values(j).filter((c) => c?.state === "running").length;
+        detail = `${running}/${total} Container running`;
+      } catch { /* ignore */ }
+    }
+    return { id: "mailcow", label: "Mailcow", status: r.status === 200 ? "ok" : "error", latency_ms: Date.now() - t0, detail };
+  } catch (e) {
+    return { id: "mailcow", label: "Mailcow", status: "error", latency_ms: Date.now() - t0, detail: e.message };
+  }
+}
+
+function sshTest(target, keyPath) {
+  return new Promise((resolve) => {
+    const t0 = Date.now();
+    const args = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=5", "-o", "StrictHostKeyChecking=accept-new"];
+    if (keyPath) args.push("-i", keyPath);
+    args.push(target, "true");
+    execFile("ssh", args, { timeout: 8000 }, (err, _so, se) => {
+      resolve({
+        target,
+        ok: !err,
+        latency_ms: Date.now() - t0,
+        detail: err ? (se || err.message).toString().split("\n")[0] : "OK",
+      });
+    });
+  });
+}
+
+async function checkSshKeys() {
+  const targets = (process.env.SSH_TARGETS || "").split(",").map((s) => s.trim()).filter(Boolean);
+  const keyPath = process.env.SSH_KEY_PATH;
+  if (keyPath && !fs.existsSync(keyPath)) {
+    return { id: "ssh", label: "SSH Keys", status: "error", detail: `Key fehlt: ${keyPath}` };
+  }
+  if (!targets.length) {
+    return { id: "ssh", label: "SSH Keys", status: "skip", detail: "Keine SSH_TARGETS konfiguriert (user@host,user@host)" };
+  }
+  const results = await Promise.all(targets.map((t) => sshTest(t, keyPath)));
+  const failed = results.filter((r) => !r.ok);
+  return {
+    id: "ssh",
+    label: "SSH Keys / Remote-Hosts",
+    status: failed.length === 0 ? "ok" : failed.length === results.length ? "error" : "warn",
+    detail: results.map((r) => `${r.target}: ${r.ok ? "OK" : r.detail}`).join(" · "),
+    children: results,
+  };
+}
+
+async function checkCrowdsec() {
+  const url = process.env.CROWDSEC_LAPI_URL;
+  if (!url) return { id: "crowdsec", label: "CrowdSec LAPI", status: "skip", detail: "Nicht konfiguriert (CROWDSEC_LAPI_URL)" };
+  const t0 = Date.now();
+  try {
+    const r = await httpJson(`${url.replace(/\/$/, "")}/v1/decisions`, {
+      headers: { "X-Api-Key": process.env.CROWDSEC_BOUNCER_KEY || "" }, insecure: true,
+    });
+    return { id: "crowdsec", label: "CrowdSec LAPI", status: r.status === 200 || r.status === 403 ? "ok" : "error", latency_ms: Date.now() - t0, detail: `HTTP ${r.status}` };
+  } catch (e) {
+    return { id: "crowdsec", label: "CrowdSec LAPI", status: "error", latency_ms: Date.now() - t0, detail: e.message };
+  }
+}
+
+async function checkCollectorHeartbeat() {
+  try {
+    const [[r]] = await pool.query("SELECT MAX(event_time) as last FROM security_events");
+    if (!r.last) return { id: "collector", label: "Log-Collector Heartbeat", status: "warn", detail: "Keine Events in DB" };
+    const ageMin = Math.round((Date.now() - new Date(r.last).getTime()) / 60000);
+    const status = ageMin < 15 ? "ok" : ageMin < 60 ? "warn" : "error";
+    return { id: "collector", label: "Log-Collector Heartbeat", status, detail: `Letztes Event vor ${ageMin} min` };
+  } catch (e) {
+    return { id: "collector", label: "Log-Collector Heartbeat", status: "error", detail: e.message };
+  }
+}
+
+function checkSystem() {
+  const load = os.loadavg();
+  const memFree = os.freemem();
+  const memTotal = os.totalmem();
+  const memUsedPct = Math.round((1 - memFree / memTotal) * 100);
+  const status = memUsedPct > 90 || load[0] > os.cpus().length * 2 ? "warn" : "ok";
+  return {
+    id: "system", label: "VM Ressourcen",
+    status,
+    detail: `Load ${load[0].toFixed(2)} · RAM ${memUsedPct}% · ${os.cpus().length} CPU`,
+  };
+}
+
+let healthCache = { at: 0, data: null };
+app.get("/api/health/checks", async (_req, res) => {
+  if (Date.now() - healthCache.at < 30_000 && healthCache.data) {
+    return res.json({ ...healthCache.data, cached: true });
+  }
+  const checks = await Promise.all([
+    checkApi(), checkDatabase(), checkCollectorHeartbeat(),
+    checkOpnsense(), checkMailcow(), checkCrowdsec(),
+    checkSshKeys(),
+  ]);
+  checks.push(checkSystem());
+  const overall = checks.some((c) => c.status === "error") ? "error"
+                : checks.some((c) => c.status === "warn") ? "warn" : "ok";
+  const data = { overall, checked_at: new Date().toISOString(), checks };
+  healthCache = { at: Date.now(), data };
+  res.json(data);
+});
+
 // ── Start ────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, "0.0.0.0", () => {
