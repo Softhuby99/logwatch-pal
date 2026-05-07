@@ -857,6 +857,85 @@ app.get("/api/health/checks", async (_req, res) => {
   res.json(data);
 });
 
+// ── SSH Setup Wizard ────────────────────────────────────────
+const SSH_KEY_DIR = process.env.SSH_KEY_DIR || "/home/node/.ssh";
+const SSH_KEY_NAME = process.env.SSH_KEY_NAME || "id_ed25519_dashboard";
+
+function runCmd(cmd, args, { timeoutMs = 15000 } = {}) {
+  return new Promise((resolve) => {
+    execFile(cmd, args, { timeout: timeoutMs }, (err, stdout, stderr) => {
+      resolve({
+        ok: !err,
+        code: err ? (err.code ?? 1) : 0,
+        stdout: String(stdout || ""),
+        stderr: String(stderr || (err ? err.message : "")),
+      });
+    });
+  });
+}
+
+app.get("/api/setup/ssh-pubkey", async (_req, res) => {
+  const pubPath = path.join(SSH_KEY_DIR, `${SSH_KEY_NAME}.pub`);
+  try {
+    const pub = await fs.promises.readFile(pubPath, "utf8");
+    res.json({ exists: true, path: pubPath, public_key: pub.trim() });
+  } catch {
+    res.json({ exists: false, path: pubPath });
+  }
+});
+
+app.post("/api/setup/ssh-keygen", async (req, res) => {
+  try {
+    const { comment = "dashboard@logsrv", overwrite = false } = req.body || {};
+    await fs.promises.mkdir(SSH_KEY_DIR, { recursive: true, mode: 0o700 });
+    const keyPath = path.join(SSH_KEY_DIR, SSH_KEY_NAME);
+    if (!overwrite) {
+      try {
+        await fs.promises.access(keyPath);
+        const pub = await fs.promises.readFile(`${keyPath}.pub`, "utf8");
+        return res.json({ created: false, reason: "exists", path: keyPath, public_key: pub.trim() });
+      } catch {}
+    } else {
+      await fs.promises.unlink(keyPath).catch(() => {});
+      await fs.promises.unlink(`${keyPath}.pub`).catch(() => {});
+    }
+    const r = await runCmd("ssh-keygen", ["-t","ed25519","-f",keyPath,"-N","","-C",comment]);
+    if (!r.ok) return res.status(500).json({ created: false, error: r.stderr || "ssh-keygen failed" });
+    const pub = await fs.promises.readFile(`${keyPath}.pub`, "utf8");
+    res.json({ created: true, path: keyPath, public_key: pub.trim() });
+  } catch (err) {
+    res.status(500).json({ created: false, error: err.message });
+  }
+});
+
+app.post("/api/setup/ssh-test", async (req, res) => {
+  const { host, user, port = 22, command = "echo ok" } = req.body || {};
+  if (!host || !user) return res.status(400).json({ ok: false, error: "host and user required" });
+  const keyPath = path.join(SSH_KEY_DIR, SSH_KEY_NAME);
+  try { await fs.promises.access(keyPath); } catch {
+    return res.status(400).json({ ok: false, error: "SSH-Key fehlt – bitte zuerst generieren." });
+  }
+  const t0 = Date.now();
+  const r = await runCmd("ssh", [
+    "-i", keyPath, "-p", String(port),
+    "-o","BatchMode=yes",
+    "-o","StrictHostKeyChecking=accept-new",
+    "-o","ConnectTimeout=6",
+    "-o","UserKnownHostsFile=" + path.join(SSH_KEY_DIR, "known_hosts"),
+    `${user}@${host}`, command,
+  ], { timeoutMs: 10000 });
+  res.json({
+    ok: r.ok, code: r.code, latency_ms: Date.now() - t0,
+    stdout: r.stdout.trim().slice(0, 500),
+    stderr: r.stderr.trim().slice(0, 500),
+    hint: !r.ok && /Permission denied/i.test(r.stderr)
+      ? "Public Key noch nicht auf dem Ziel hinterlegt."
+      : !r.ok && /resolve|refused|timed out|No route/i.test(r.stderr)
+        ? "Host nicht erreichbar (DNS / Port / Firewall)."
+        : undefined,
+  });
+});
+
 // ── Start ────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, "0.0.0.0", () => {
