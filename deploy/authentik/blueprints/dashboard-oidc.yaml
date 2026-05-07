@@ -13,7 +13,9 @@ entries:
     identifiers:
       name: dashboard-oidc
     attrs:
-      client_type: confidential
+      # SPA / browser app → public client with PKCE (no client_secret possible
+      # because the JS bundle is not a confidential environment).
+      client_type: public
       client_id: !Env [OIDC_CLIENT_ID, dashboard]
       authorization_flow: !Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]
       property_mappings:
