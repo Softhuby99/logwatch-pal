@@ -12,6 +12,7 @@ import SetupWizard from "./pages/SetupWizard.tsx";
 import { IpDetailProvider } from "./contexts/IpDetailContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ApiLiveProvider } from "./contexts/ApiLiveContext";
+import { RefreshSettingsProvider } from "./contexts/RefreshSettingsContext";
 import { RequireAuth } from "./components/auth/RequireAuth";
 
 const queryClient = new QueryClient();
@@ -24,6 +25,7 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <ApiLiveProvider>
+            <RefreshSettingsProvider>
             <IpDetailProvider>
             <Routes>
               <Route path="/login" element={<Login />} />
@@ -49,6 +51,7 @@ const App = () => (
               <Route path="*" element={<NotFound />} />
             </Routes>
             </IpDetailProvider>
+            </RefreshSettingsProvider>
           </ApiLiveProvider>
         </AuthProvider>
       </BrowserRouter>
