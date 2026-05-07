@@ -44,6 +44,10 @@ services:
       MARIADB_PASSWORD: ${MARIADB_PASSWORD:-logpass123}
       MARIADB_DATABASE: ${MARIADB_DATABASE:-logdb}
       PORT: "3001"
+      SSH_KEY_DIR: /home/node/.ssh
+      SSH_KEY_NAME: id_ed25519_dashboard
+    volumes:
+      - api_ssh:/home/node/.ssh
     networks:
       - default
       - shared-db
