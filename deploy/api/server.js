@@ -1111,7 +1111,7 @@ async function opnsenseCall(pathname) {
   const url = base.replace(/\/+$/, "") + pathname;
   const t0 = Date.now();
   try {
-    const r = await httpsRequest(url, { headers: { Authorization: auth, Accept: "application/json" }, insecure, timeoutMs: 8000 });
+    const r = await intHttpRequest(url, { headers: { Authorization: auth, Accept: "application/json" }, insecure, timeoutMs: 8000 });
     let parsed = null;
     try { parsed = JSON.parse(r.body); } catch { parsed = { raw: r.body.slice(0, 400) }; }
     return { configured: true, ok: r.status >= 200 && r.status < 300, status: r.status, latency_ms: Date.now() - t0, data: parsed };
@@ -1143,7 +1143,7 @@ async function mailcowCall(pathname) {
   const url = base.replace(/\/+$/, "") + pathname;
   const t0 = Date.now();
   try {
-    const r = await httpsRequest(url, { headers: { "X-API-Key": key, Accept: "application/json" }, insecure, timeoutMs: 8000 });
+    const r = await intHttpRequest(url, { headers: { "X-API-Key": key, Accept: "application/json" }, insecure, timeoutMs: 8000 });
     let parsed = null;
     try { parsed = JSON.parse(r.body); } catch { parsed = { raw: r.body.slice(0, 400) }; }
     return { configured: true, ok: r.status >= 200 && r.status < 300, status: r.status, latency_ms: Date.now() - t0, data: parsed };
@@ -1176,7 +1176,7 @@ async function crowdsecCall(pathname) {
   const url = base.replace(/\/+$/, "") + pathname;
   const t0 = Date.now();
   try {
-    const r = await httpsRequest(url, {
+    const r = await intHttpRequest(url, {
       headers: { "X-Api-Key": key, Accept: "application/json" },
       insecure: true, timeoutMs: 8000,
     });
