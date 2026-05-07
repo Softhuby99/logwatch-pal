@@ -48,10 +48,12 @@ services:
       SSH_KEY_NAME: id_ed25519_dashboard
     volumes:
       - api_ssh:/home/node/.ssh
-    # Map host.docker.internal so the api can reach a MariaDB running on the
-    # docker host (or any other reachable IP) without depending on an external
-    # docker network. If your MariaDB lives in another compose project, set
-    # MARIADB_HOST to its container name and attach that network manually.
+    # Attach to the same docker network as your MariaDB container so DNS
+    # resolves the container name set in MARIADB_HOST. Configure the network
+    # name via LOGDB_NETWORK in .env (e.g. logserver_default).
+    networks:
+      - default
+      - logdb_net
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
