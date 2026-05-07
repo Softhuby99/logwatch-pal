@@ -13,12 +13,16 @@ const chartConfig = {
 };
 
 const AuthTimeline = () => {
-  const { data } = useApiData(
+  const { data, live } = useApiData(
     () => fetchAuthTimeline(authFailureTimeline),
     [],
     30_000
   );
-  const chartData = data && data.length > 0 ? data : authFailureTimeline;
+  // Only fall back to mock data when the API is NOT reachable. When the API
+  // returns an empty array (no auth failures in the last 24h) we must show
+  // that real (empty) state — otherwise clicking on a mock spike opens a
+  // drilldown that queries a real hour with zero events.
+  const chartData = live ? (data ?? []) : authFailureTimeline;
 
   const [sheet, setSheet] = useState<{ open: boolean; hour: string | null }>({
     open: false,
@@ -26,6 +30,9 @@ const AuthTimeline = () => {
   });
 
   const handleClick = (e: any) => {
+    // Disable drilldown when we're showing mock data — there is nothing real
+    // to inspect for that hour.
+    if (!live) return;
     const hour = e?.activeLabel as string | undefined;
     if (hour) setSheet({ open: true, hour });
   };
@@ -44,7 +51,7 @@ const AuthTimeline = () => {
               data={chartData}
               margin={{ top: 5, right: 5, bottom: 0, left: -20 }}
               onClick={handleClick}
-              style={{ cursor: "pointer" }}
+              style={{ cursor: live ? "pointer" : "default" }}
             >
               <defs>
                 <linearGradient id="smtpGrad" x1="0" y1="0" x2="0" y2="1">
@@ -65,7 +72,9 @@ const AuthTimeline = () => {
             </AreaChart>
           </ChartContainer>
           <p className="mt-1 text-[10px] text-muted-foreground/70 font-mono">
-            Tipp: Auf einen Zeitpunkt klicken für Details (Events &amp; IPs).
+            {live
+              ? "Tipp: Auf einen Zeitpunkt klicken für Details (Events & IPs)."
+              : "Demo-Daten – API nicht erreichbar. Drilldown deaktiviert."}
           </p>
         </CardContent>
       </Card>
