@@ -208,6 +208,7 @@ volumes:
   authentik-db:
   authentik-redis:
   authentik-media:
+  api_ssh:
 
 networks:
   default:
