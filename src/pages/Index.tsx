@@ -25,7 +25,12 @@ const Index = () => (
           </div>
           <div>
             <h1 className="text-sm font-semibold">LogCollector SOC</h1>
-            <p className="text-[10px] text-muted-foreground">v2.9.3 • Mailcow + CrowdSec</p>
+            <p className="text-[10px] text-muted-foreground leading-tight">
+              Collector v2.9.3 • Mailcow + CrowdSec
+            </p>
+            <p className="text-[10px] text-muted-foreground/70 leading-tight">
+              Dashboard v0.4
+            </p>
           </div>
         </div>
         <HeaderUserMenu />
