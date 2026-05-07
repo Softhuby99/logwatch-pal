@@ -6,9 +6,7 @@ import express from "express";
 import cors from "cors";
 import mysql from "mysql2/promise";
 import { spawn } from "child_process";
-import { promises as fs } from "fs";
 import path from "path";
-import os from "os";
 
 const app = express();
 app.use(cors());
