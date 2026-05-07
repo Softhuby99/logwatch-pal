@@ -51,7 +51,7 @@ const AuthTimeline = () => {
               data={chartData}
               margin={{ top: 5, right: 5, bottom: 0, left: -20 }}
               onClick={handleClick}
-              style={{ cursor: "pointer" }}
+              style={{ cursor: live ? "pointer" : "default" }}
             >
               <defs>
                 <linearGradient id="smtpGrad" x1="0" y1="0" x2="0" y2="1">
@@ -72,7 +72,9 @@ const AuthTimeline = () => {
             </AreaChart>
           </ChartContainer>
           <p className="mt-1 text-[10px] text-muted-foreground/70 font-mono">
-            Tipp: Auf einen Zeitpunkt klicken für Details (Events &amp; IPs).
+            {live
+              ? "Tipp: Auf einen Zeitpunkt klicken für Details (Events & IPs)."
+              : "Demo-Daten – API nicht erreichbar. Drilldown deaktiviert."}
           </p>
         </CardContent>
       </Card>
