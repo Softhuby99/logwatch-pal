@@ -129,6 +129,10 @@ export const HeaderUserMenu = () => {
               <Settings2 className="mr-2 h-4 w-4" />
               Tools &amp; Einstellungen
             </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setStatusOpen(true)} className="cursor-pointer">
+              <Heart className="mr-2 h-4 w-4" />
+              System Status
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setInfoOpen(true)} className="cursor-pointer">
               <Info className="mr-2 h-4 w-4" />
               Info &amp; Glossar
