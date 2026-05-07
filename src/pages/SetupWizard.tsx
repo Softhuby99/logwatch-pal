@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowRight,
@@ -10,6 +10,11 @@ import {
   KeyRound,
   Download,
   Check,
+  Terminal,
+  Loader2,
+  Copy,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +23,8 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+
+const API_BASE = (import.meta.env.VITE_API_URL as string | undefined) || "/api";
 
 interface WizardState {
   // Server users
