@@ -46,6 +46,17 @@ services:
       PORT: "3001"
       SSH_KEY_DIR: /home/node/.ssh
       SSH_KEY_NAME: id_ed25519_dashboard
+      # Remote targets & external APIs
+      REMOTE_HOSTS: ${REMOTE_HOSTS:-}
+      OPNSENSE_HOST: ${OPNSENSE_HOST:-}
+      OPNSENSE_API_KEY: ${OPNSENSE_API_KEY:-}
+      OPNSENSE_API_SECRET: ${OPNSENSE_API_SECRET:-}
+      OPNSENSE_INSECURE_TLS: ${OPNSENSE_INSECURE_TLS:-1}
+      MAILCOW_HOST: ${MAILCOW_HOST:-}
+      MAILCOW_API_KEY: ${MAILCOW_API_KEY:-}
+      MAILCOW_INSECURE_TLS: ${MAILCOW_INSECURE_TLS:-1}
+      CROWDSEC_LAPI_URL: ${CROWDSEC_LAPI_URL:-}
+      CROWDSEC_BOUNCER_KEY: ${CROWDSEC_BOUNCER_KEY:-}
     volumes:
       - api_ssh:/home/node/.ssh
     # Attach to the same docker network as your MariaDB container so DNS
