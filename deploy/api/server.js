@@ -925,8 +925,9 @@ app.get("/api/health/checks", async (_req, res) => {
 });
 
 // ── SSH Setup Wizard ────────────────────────────────────────
-const SSH_KEY_DIR = process.env.SSH_KEY_DIR || "/home/node/.ssh";
-const SSH_KEY_NAME = process.env.SSH_KEY_NAME || "id_ed25519_dashboard";
+// SSH_KEY_DIR / SSH_KEY_NAME are imported from the bootstrap block at top of file.
+// Alias to local names used by the wizard helpers below.
+const SSH_KEY_DIR = SSH_DIR;
 
 function runCmd(cmd, args, { timeoutMs = 15000 } = {}) {
   return new Promise((resolve) => {
