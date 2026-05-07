@@ -768,15 +768,15 @@ async function checkApi() {
 }
 
 async function checkOpnsense() {
-  const url = process.env.OPNSENSE_URL;
-  const key = process.env.OPNSENSE_KEY;
-  const sec = process.env.OPNSENSE_SECRET;
-  if (!url) return { id: "opnsense", label: "OPNsense", status: "skip", detail: "Nicht konfiguriert (OPNSENSE_URL)" };
+  const url = process.env.OPNSENSE_HOST || process.env.OPNSENSE_URL;
+  const key = process.env.OPNSENSE_API_KEY || process.env.OPNSENSE_KEY;
+  const sec = process.env.OPNSENSE_API_SECRET || process.env.OPNSENSE_SECRET;
+  if (!url) return { id: "opnsense", label: "OPNsense", status: "skip", detail: "Nicht konfiguriert (OPNSENSE_HOST)" };
   const t0 = Date.now();
   try {
     const auth = "Basic " + Buffer.from(`${key}:${sec}`).toString("base64");
     const r = await httpJson(`${url.replace(/\/$/, "")}/api/core/firmware/status`, {
-      headers: { Authorization: auth }, insecure: process.env.OPNSENSE_INSECURE === "1",
+      headers: { Authorization: auth }, insecure: process.env.OPNSENSE_INSECURE_TLS === "1" || process.env.OPNSENSE_INSECURE === "1",
     });
     return {
       id: "opnsense", label: "OPNsense",
@@ -790,13 +790,13 @@ async function checkOpnsense() {
 }
 
 async function checkMailcow() {
-  const url = process.env.MAILCOW_URL;
+  const url = process.env.MAILCOW_HOST || process.env.MAILCOW_URL;
   const key = process.env.MAILCOW_API_KEY;
-  if (!url) return { id: "mailcow", label: "Mailcow", status: "skip", detail: "Nicht konfiguriert (MAILCOW_URL)" };
+  if (!url) return { id: "mailcow", label: "Mailcow", status: "skip", detail: "Nicht konfiguriert (MAILCOW_HOST)" };
   const t0 = Date.now();
   try {
     const r = await httpJson(`${url.replace(/\/$/, "")}/api/v1/get/status/containers`, {
-      headers: { "X-API-Key": key || "" }, insecure: process.env.MAILCOW_INSECURE === "1",
+      headers: { "X-API-Key": key || "" }, insecure: process.env.MAILCOW_INSECURE_TLS === "1" || process.env.MAILCOW_INSECURE === "1",
     });
     let detail = `HTTP ${r.status}`;
     if (r.status === 200) {
