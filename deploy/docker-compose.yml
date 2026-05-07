@@ -48,9 +48,12 @@ services:
       SSH_KEY_NAME: id_ed25519_dashboard
     volumes:
       - api_ssh:/home/node/.ssh
-    networks:
-      - default
-      - shared-db
+    # Map host.docker.internal so the api can reach a MariaDB running on the
+    # docker host (or any other reachable IP) without depending on an external
+    # docker network. If your MariaDB lives in another compose project, set
+    # MARIADB_HOST to its container name and attach that network manually.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3001/api/health"]
       interval: 15s
@@ -212,5 +215,4 @@ volumes:
 
 networks:
   default:
-  shared-db:
-    external: true
+
