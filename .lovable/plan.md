@@ -1,53 +1,60 @@
-# Ziel
-Die leeren Ansichten und der 502-Fehler werden nicht weiter per Trial-and-Error behandelt, sondern in einer festen Reihenfolge: erst Deployment-Stand korrigieren, dann die 3 betroffenen Datenpfade absichern, danach gezielt validieren.
+# Was du tun sollst
 
-# Was ich konkret umsetzen werde
-1. **Deployment-Stand eindeutig machen**
-   - Sicherstellen, dass API und Dashboard dieselbe aktuelle Version ausliefern.
-   - Einen klaren Prüfschritt einbauen, damit sofort sichtbar ist, ob auf dem Zielsystem noch ein altes Image läuft.
-   - Den 502-Pfad mit einer robusteren Start-/Health-Prüfung absichern, damit Nginx nicht gegen einen veralteten oder nicht sauber gestarteten Upstream läuft.
+Du hast bisher nichts auf deinem Server, weil ich im Plan-Modus bin und noch keine Datei geschrieben habe. Wenn du den Plan freigibst, lege ich genau **eine neue Datei** an:
 
-2. **`/api/auth-timeline` datenfest machen**
-   - Die Failure-Erkennung für `auth_events` an echte Daten angleichen, statt nur auf die bisherigen String-Muster zu vertrauen.
-   - Die 24h-Ansicht weiterhin lückenlos mit 24 Buckets liefern, auch wenn nur wenige oder anders normalisierte Events vorhanden sind.
-   - Falls keine Auth-Fehler existieren, soll die Route sauber `[]`/Nullwerte liefern statt einen irreführenden Zwischenzustand.
+```
+deploy/diagnose-502.sh
+```
 
-3. **`/api/aggressive-ips-30d` stabilisieren**
-   - Den bestehenden Fallback nicht nur bei SQL-Fehlern, sondern auch bei unbrauchbaren/teilweisen View-Ergebnissen robust machen.
-   - Sicherstellen, dass die Liste aus `ip_summary`/Enrichment/Risk zuverlässig befüllt wird, wenn die Spezial-View leer oder inkonsistent ist.
+Danach machst du auf deinem Log-Server **drei** Dinge:
 
-4. **IP-Aktivitätschart für `80.187.83.199` korrigieren**
-   - Die Chart-Logik so erweitern, dass nicht nur Auth-Fehler, sondern auch **Auth-Erfolge** als Aktivität sichtbar werden.
-   - Dadurch erscheinen IPs mit echten Login-Events in „Aktivität · letzte 30 Tage · täglich“, auch wenn keine Security-Events oder Bans vorliegen.
-   - Die Event-Timeline bleibt dabei getrennt und korrekt klassifiziert.
+```bash
+cd /opt/dashboard
+git pull
+bash deploy/diagnose-502.sh
+```
 
-5. **Graceful Degradation für API-Antworten**
-   - Kritische Dashboard-Endpunkte so härten, dass sie bei Teilfehlern strukturierte JSON-Antworten statt 500/Crash-Verhalten liefern.
-   - Ziel: Frontend bleibt nutzbar, auch wenn eine Quelle leer ist oder eine View auf dem Server fehlt.
+Das Script macht **keine** Änderungen am System. Es liest nur Status aus und gibt am Ende eine klare Zeile aus, **wo** die 502-Kette bricht.
 
-6. **Gezielte End-to-End-Validierung**
-   - Nach der Umsetzung überprüfe ich genau diese Endpunkte:
-     - `/api/version`
-     - `/api/auth-debug`
-     - `/api/auth-timeline`
-     - `/api/aggressive-ips-30d`
-     - `/api/ip/80.187.83.199`
-     - `/api/ip/80.187.83.199/events`
-   - Erwartung:
-     - Version ist aktuell
-     - `auth-debug` existiert
-     - Auth-Timeline liefert valide Buckets
-     - aggressive IPs sind nicht leer
-     - die IP-Aktivität zeigt die vorhandenen 12 Success-Events sichtbar an
+# Was das Script prüft (in dieser Reihenfolge)
 
-# Technische Details
-- **Bereits bestätigt:** Im Code ist `API_VERSION = "0.6.4-fixes"` und die Route `/api/auth-debug` existiert bereits. Dass dein Server `0.6.0-integrations` meldet, ist ein klarer Hinweis auf **altes laufendes Deployment**, nicht auf fehlende Route im aktuellen Code.
-- **Warum die IP-Historie leer bleibt:** Die aktuelle Chart-Klassifikation zählt `auth_success` nicht als Aktivitätsspur. Für eine IP mit 12 erfolgreichen IMAP-Logins gibt es deshalb faktisch sichtbare Events in der Timeline, aber keine Kurve im Aktivitätschart.
-- **Warum 502 zusätzlich auftritt:** Das ist sehr wahrscheinlich ein Proxy/Upstream-Thema auf dem Zielsystem, nicht dieselbe Ursache wie die leeren Widgets. Ich behandle deshalb API-Version und Proxy-Erreichbarkeit getrennt.
+1. **Container-Status**
+   `docker compose ps` für `api` und `dashboard` — laufen beide? `healthy`?
 
-# Ergebnis nach Umsetzung
-Du bekommst eine reproduzierbare Kette statt weiterer Blindversuche:
-- aktuelles Deployment nachweisbar aktiv
-- keine leeren Kernwidgets trotz View-/Datenunterschieden
-- sichtbare Aktivität für IPs mit Login-Erfolgen
-- 502 sauber auf Upstream/Proxy eingegrenzt und abgesichert
+2. **API direkt auf dem Host**
+   `curl -fsS http://127.0.0.1:3001/api/version`
+   → muss `0.6.5-auth-success-chart` liefern (wissen wir schon, dient als Baseline).
+
+3. **Dashboard-Container intern erreichbar?**
+   `curl -fsS -o /dev/null -w "%{http_code}\n" http://127.0.0.1:${DASHBOARD_PORT:-8080}/`
+   → erwartet `200`. Wenn `000`/Connection refused → Dashboard-Container down oder Port-Bind falsch.
+
+4. **Dashboard → API intern (Docker-DNS)**
+   `docker compose exec dashboard wget -qO- http://api:3001/api/version`
+   → erwartet `0.6.5...`. Wenn leer/Fehler → das interne Nginx im Dashboard-Container hat **stale DNS** auf den alten `api`-Container (das ist der wahrscheinlichste 502-Grund nach `--force-recreate api dashboard`).
+
+5. **Authentik-Outpost lebt?**
+   `curl -kI https://192.168.3.12:9443/` (aus deiner `dashboard.conf` für `/sso/`)
+   → erwartet `200/302`. Wenn nicht → Authentik-Kette ist die Ursache, nicht das Dashboard.
+
+6. **OPNsense-Edge**
+   `curl -kI https://logdash.servuswir.de/` und `curl -kI https://logdash.servuswir.de/api/version`
+   → zeigt, wo OPNsense den 502 wirft (auf `/` oder erst auf `/api/`).
+
+7. **Letzte 50 Logzeilen** von `api` und `dashboard` (`docker compose logs --tail=50 api dashboard`).
+
+# Auswertung – was du mir danach schickst
+
+Einfach die **komplette Ausgabe** des Scripts in den Chat. Anhand der Zeilen 3, 4 und 6 sehe ich eindeutig:
+
+- Bricht es bei **3** → Dashboard-Container nicht da/Port falsch.
+- Bricht es bei **4** → bestätigtes Stale-DNS-Problem im internen Nginx → Fix: `docker compose restart dashboard` (sofortiger Test) und danach dauerhaft Resolver in `dashboard.conf`.
+- Bricht es nur bei **6** → Problem liegt **außerhalb** deines Stacks (OPNsense-Upstream-Cache oder Authentik-Outpost), nicht im Dashboard.
+
+# Was ich in diesem Schritt **nicht** anfasse
+
+- Keine Änderung an `dashboard.conf` (der in #966 bewusst zurückgerollte Stand bleibt).
+- Keine Änderung an `sync.sh`.
+- Keine Änderung an React-Code, OPNsense, Authentik.
+
+Erst wenn die Diagnose-Ausgabe eindeutig ist, schlage ich **gezielt** den passenden Mini-Fix vor – nicht vorher.
