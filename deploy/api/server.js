@@ -58,7 +58,7 @@ app.get("/api/ssh/pubkey", (_req, res) => {
 
 // Version marker — bump on each meaningful change so we can confirm
 // the running container actually has the new code.
-const API_VERSION = "0.6.3-auth-debug";
+const API_VERSION = "0.6.4-fixes";
 app.get("/api/version", (_req, res) => res.json({ version: API_VERSION }));
 console.log(`[startup] API version ${API_VERSION}`);
 
@@ -265,43 +265,72 @@ app.get("/api/ip-stats-7d", async (_req, res) => {
 
 // ── Aggressive IPs 30 Days (View + enrichment + risk) ───────
 app.get("/api/aggressive-ips-30d", async (_req, res) => {
+  const mapRow = (r) => ({
+    ...r,
+    total_events: Number(r.total_events || 0),
+    total_bans: Number(r.total_bans || 0),
+    total_auth_failures: Number(r.total_auth_failures || 0),
+    risk_score: Number(r.risk_score || 0),
+  });
   try {
-    const [rows] = await pool.query(`
-      SELECT
-        v.ip,
-        v.treffer as total_events,
-        v.level as last_alert_level,
-        v.quelle as last_source_component,
-        v.grund as last_event_type,
-        v.konto as last_username,
-        v.last_seen,
-        v.letzte_meldung as last_message,
-        e.country,
-        e.asn,
-        e.org_name,
-        e.ptr,
-        COALESCE(r.score, 0) as risk_score,
-        COALESCE(r.risk_level, 'LOW') as risk_level,
-        s.total_bans,
-        s.total_auth_failures,
-        s.current_status,
-        s.last_target_email,
-        s.last_destination_port,
-        s.last_destination_service
-      FROM vw_top_aggressive_external_ips_30d_v3 v
-      LEFT JOIN ip_enrichment e ON v.ip = e.ip
-      LEFT JOIN ip_risk_score r ON v.ip = r.ip
-      LEFT JOIN ip_summary s ON v.ip = s.ip
-      ORDER BY COALESCE(r.score, 0) DESC
-      LIMIT 100
-    `);
-    res.json(rows.map(r => ({
-      ...r,
-      total_events: Number(r.total_events),
-      total_bans: Number(r.total_bans || 0),
-      total_auth_failures: Number(r.total_auth_failures || 0),
-      risk_score: Number(r.risk_score),
-    })));
+    let rows = [];
+    // 1) Primärquelle: vorhandene View
+    try {
+      const [viewRows] = await pool.query(`
+        SELECT
+          v.ip,
+          v.treffer as total_events,
+          v.level as last_alert_level,
+          v.quelle as last_source_component,
+          v.grund as last_event_type,
+          v.konto as last_username,
+          v.last_seen,
+          v.letzte_meldung as last_message,
+          e.country, e.asn, e.org_name, e.ptr,
+          COALESCE(r.score, 0) as risk_score,
+          COALESCE(r.risk_level, 'LOW') as risk_level,
+          s.total_bans, s.total_auth_failures, s.current_status,
+          s.last_target_email, s.last_destination_port, s.last_destination_service
+        FROM vw_top_aggressive_external_ips_30d_v3 v
+        LEFT JOIN ip_enrichment e ON v.ip = e.ip
+        LEFT JOIN ip_risk_score r ON v.ip = r.ip
+        LEFT JOIN ip_summary s ON v.ip = s.ip
+        ORDER BY COALESCE(r.score, 0) DESC
+        LIMIT 100
+      `);
+      rows = viewRows;
+    } catch (viewErr) {
+      console.warn("[aggressive-ips-30d] view query failed, falling back:", viewErr.message);
+    }
+
+    // 2) Fallback: direkter Aggregat-Query, wenn View leer oder fehlt
+    if (!rows || rows.length === 0) {
+      const [fbRows] = await pool.query(`
+        SELECT
+          s.ip,
+          s.total_events,
+          s.last_alert_level,
+          s.last_source_component,
+          s.last_event_type,
+          s.last_username,
+          s.last_seen,
+          NULL as last_message,
+          e.country, e.asn, e.org_name, e.ptr,
+          COALESCE(r.score, 0) as risk_score,
+          COALESCE(r.risk_level, 'LOW') as risk_level,
+          s.total_bans, s.total_auth_failures, s.current_status,
+          s.last_target_email, s.last_destination_port, s.last_destination_service
+        FROM ip_summary s
+        LEFT JOIN ip_enrichment e ON s.ip = e.ip
+        LEFT JOIN ip_risk_score r ON s.ip = r.ip
+        WHERE s.last_seen > NOW() - INTERVAL 30 DAY
+          AND COALESCE(e.ip_scope, 'external') = 'external'
+        ORDER BY COALESCE(r.score, 0) DESC, s.total_events DESC
+        LIMIT 100
+      `);
+      rows = fbRows;
+    }
+    res.json(rows.map(mapRow));
   } catch (err) {
     console.error("GET /api/aggressive-ips-30d error:", err);
     res.status(500).json({ error: err.message });
@@ -388,13 +417,12 @@ app.get("/api/attack-timeline", async (req, res) => {
   }
 });
 
-// ── Auth Failure Timeline (per hour, last 24h) ──────────────
+// ── Auth Failure Timeline (per hour, last 24h, zero-filled) ──
 app.get("/api/auth-timeline", async (_req, res) => {
   try {
     const [rows] = await pool.query(`
       SELECT
         DATE_FORMAT(event_time, '%Y-%m-%d %H:00:00') as bucket_start,
-        DATE_FORMAT(event_time, '%H:00') as hour,
         SUM(CASE WHEN ${SMTP_LOGIN_WHERE} THEN 1 ELSE 0 END) as smtp,
         SUM(CASE WHEN ${IMAP_LOGIN_WHERE} THEN 1 ELSE 0 END) as imap,
         SUM(CASE WHEN NOT (${SMTP_LOGIN_WHERE}) AND NOT (${IMAP_LOGIN_WHERE}) THEN 1 ELSE 0 END) as other
@@ -402,16 +430,30 @@ app.get("/api/auth-timeline", async (_req, res) => {
       WHERE ${AUTH_FAILURE_WHERE}
         AND event_time >= DATE_SUB(DATE_FORMAT(NOW(), '%Y-%m-%d %H:00:00'), INTERVAL 23 HOUR)
         AND event_time < DATE_ADD(DATE_FORMAT(NOW(), '%Y-%m-%d %H:00:00'), INTERVAL 1 HOUR)
-      GROUP BY bucket_start, hour
+      GROUP BY bucket_start
       ORDER BY bucket_start ASC
     `);
-    res.json(rows.map(r => ({
-      hour: String(r.hour),
-      bucket_start: String(r.bucket_start),
-      smtp: Number(r.smtp || 0),
-      imap: Number(r.imap || 0),
+    const byBucket = new Map();
+    for (const r of rows) {
+      byBucket.set(String(r.bucket_start), {
+        smtp: Number(r.smtp || 0),
+        imap: Number(r.imap || 0),
         other: Number(r.other || 0),
-    })));
+      });
+    }
+    // Zero-fill 24 stündliche Buckets
+    const out = [];
+    const now = new Date();
+    const baseHour = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), 0, 0);
+    for (let i = 23; i >= 0; i--) {
+      const d = new Date(baseHour.getTime() - i * 3600_000);
+      const pad = (n) => String(n).padStart(2, "0");
+      const bucket_start = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:00:00`;
+      const hour = `${pad(d.getHours())}:00`;
+      const v = byBucket.get(bucket_start) || { smtp: 0, imap: 0, other: 0 };
+      out.push({ hour, bucket_start, ...v });
+    }
+    res.json(out);
   } catch (err) {
     console.error("GET /api/auth-timeline error:", err);
     res.status(500).json({ error: err.message });
@@ -620,7 +662,7 @@ app.get("/api/ip/:ip", async (req, res) => {
   }
 });
 
-// ── IP Events (for timeline) ────────────────────────────────
+// ── IP Events (for timeline) – inkl. daily-Fallback ─────────
 app.get("/api/ip/:ip/events", async (req, res) => {
   try {
     const ip = req.params.ip;
@@ -633,7 +675,17 @@ app.get("/api/ip/:ip/events", async (req, res) => {
       `SELECT *, 'auth_events' as _table FROM auth_events WHERE ip = ? ORDER BY event_time DESC LIMIT ?`,
       [ip, limit]
     );
-    res.json({ security_events: secEvents, auth_events: authEvents });
+    let daily = [];
+    try {
+      const [dailyRows] = await pool.query(
+        `SELECT * FROM ip_daily_summary WHERE ip = ? ORDER BY summary_date DESC LIMIT 30`,
+        [ip]
+      );
+      daily = dailyRows;
+    } catch (e) {
+      console.warn(`[ip/events] daily fallback query failed for ${ip}:`, e.message);
+    }
+    res.json({ security_events: secEvents, auth_events: authEvents, daily });
   } catch (err) {
     console.error(`GET /api/ip/${req.params.ip}/events error:`, err);
     res.status(500).json({ error: err.message });

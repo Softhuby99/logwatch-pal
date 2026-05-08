@@ -43,6 +43,14 @@ interface IpDetailApi {
 interface IpEventsApi {
   security_events: SecurityEvent[];
   auth_events: AuthEvent[];
+  daily?: Array<{
+    summary_date: string;
+    auth_failed?: number;
+    security_events?: number;
+    total_events?: number;
+    crit_events?: number;
+    warn_events?: number;
+  }>;
 }
 
 interface Props {
@@ -157,7 +165,7 @@ const IpDetailView = ({ ip, embedded = false }: Props) => {
     [ip]
   );
   const eventsQ = useApiData<IpEventsApi>(
-    () => fetchIpEvents<IpEventsApi>(ip, { security_events: [], auth_events: [] }),
+    () => fetchIpEvents<IpEventsApi>(ip, { security_events: [], auth_events: [], daily: [] }),
     [ip]
   );
 
@@ -251,7 +259,7 @@ const IpDetailView = ({ ip, embedded = false }: Props) => {
       <BanTimeline intervals={ban_intervals} compact={embedded} events={events} />
 
       {/* Aktivität (24h / 7T / 30T / 90T / einzelnes Datum) */}
-      <IpActivityChart events={events} />
+      <IpActivityChart events={events} dailyFallback={eventsQ.data?.daily ?? []} />
 
       {/* Top Reasons Bar Chart */}
       {by_type.length > 0 && (
