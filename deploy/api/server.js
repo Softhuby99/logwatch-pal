@@ -417,13 +417,12 @@ app.get("/api/attack-timeline", async (req, res) => {
   }
 });
 
-// ── Auth Failure Timeline (per hour, last 24h) ──────────────
+// ── Auth Failure Timeline (per hour, last 24h, zero-filled) ──
 app.get("/api/auth-timeline", async (_req, res) => {
   try {
     const [rows] = await pool.query(`
       SELECT
         DATE_FORMAT(event_time, '%Y-%m-%d %H:00:00') as bucket_start,
-        DATE_FORMAT(event_time, '%H:00') as hour,
         SUM(CASE WHEN ${SMTP_LOGIN_WHERE} THEN 1 ELSE 0 END) as smtp,
         SUM(CASE WHEN ${IMAP_LOGIN_WHERE} THEN 1 ELSE 0 END) as imap,
         SUM(CASE WHEN NOT (${SMTP_LOGIN_WHERE}) AND NOT (${IMAP_LOGIN_WHERE}) THEN 1 ELSE 0 END) as other
@@ -431,16 +430,30 @@ app.get("/api/auth-timeline", async (_req, res) => {
       WHERE ${AUTH_FAILURE_WHERE}
         AND event_time >= DATE_SUB(DATE_FORMAT(NOW(), '%Y-%m-%d %H:00:00'), INTERVAL 23 HOUR)
         AND event_time < DATE_ADD(DATE_FORMAT(NOW(), '%Y-%m-%d %H:00:00'), INTERVAL 1 HOUR)
-      GROUP BY bucket_start, hour
+      GROUP BY bucket_start
       ORDER BY bucket_start ASC
     `);
-    res.json(rows.map(r => ({
-      hour: String(r.hour),
-      bucket_start: String(r.bucket_start),
-      smtp: Number(r.smtp || 0),
-      imap: Number(r.imap || 0),
+    const byBucket = new Map();
+    for (const r of rows) {
+      byBucket.set(String(r.bucket_start), {
+        smtp: Number(r.smtp || 0),
+        imap: Number(r.imap || 0),
         other: Number(r.other || 0),
-    })));
+      });
+    }
+    // Zero-fill 24 stündliche Buckets
+    const out = [];
+    const now = new Date();
+    const baseHour = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), 0, 0);
+    for (let i = 23; i >= 0; i--) {
+      const d = new Date(baseHour.getTime() - i * 3600_000);
+      const pad = (n) => String(n).padStart(2, "0");
+      const bucket_start = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:00:00`;
+      const hour = `${pad(d.getHours())}:00`;
+      const v = byBucket.get(bucket_start) || { smtp: 0, imap: 0, other: 0 };
+      out.push({ hour, bucket_start, ...v });
+    }
+    res.json(out);
   } catch (err) {
     console.error("GET /api/auth-timeline error:", err);
     res.status(500).json({ error: err.message });
