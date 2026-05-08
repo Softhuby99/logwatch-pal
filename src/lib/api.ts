@@ -41,6 +41,7 @@ export interface AuthTimelineRow {
   bucket_start?: string;
   smtp: number;
   imap: number;
+  other?: number;
 }
 
 export interface EventsBySourceRow {
