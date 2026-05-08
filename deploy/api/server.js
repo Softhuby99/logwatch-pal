@@ -414,10 +414,14 @@ app.get("/api/auth-events/by-hour", async (req, res) => {
     if (type === "smtp") typeFilter = "AND login_type = 'smtp'";
     else if (type === "imap") typeFilter = "AND login_type IN ('imap','pop3')";
 
+    // NOTE: use 25h window (not 24h) so the oldest bar of the rolling 24h
+    // chart stays clickable even after the window has slid forward by a few
+    // minutes between render and click. Otherwise the leftmost hour bucket
+    // returns 0 events.
     const [events] = await pool.query(
       `SELECT * FROM auth_events
        WHERE auth_status = 'failed'
-         AND event_time > NOW() - INTERVAL 24 HOUR
+         AND event_time > NOW() - INTERVAL 25 HOUR
          AND DATE_FORMAT(event_time, '%H:00') = ?
          ${typeFilter}
        ORDER BY event_time DESC
