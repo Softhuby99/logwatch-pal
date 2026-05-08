@@ -662,7 +662,7 @@ app.get("/api/ip/:ip", async (req, res) => {
   }
 });
 
-// ── IP Events (for timeline) ────────────────────────────────
+// ── IP Events (for timeline) – inkl. daily-Fallback ─────────
 app.get("/api/ip/:ip/events", async (req, res) => {
   try {
     const ip = req.params.ip;
@@ -675,7 +675,17 @@ app.get("/api/ip/:ip/events", async (req, res) => {
       `SELECT *, 'auth_events' as _table FROM auth_events WHERE ip = ? ORDER BY event_time DESC LIMIT ?`,
       [ip, limit]
     );
-    res.json({ security_events: secEvents, auth_events: authEvents });
+    let daily = [];
+    try {
+      const [dailyRows] = await pool.query(
+        `SELECT * FROM ip_daily_summary WHERE ip = ? ORDER BY summary_date DESC LIMIT 30`,
+        [ip]
+      );
+      daily = dailyRows;
+    } catch (e) {
+      console.warn(`[ip/events] daily fallback query failed for ${ip}:`, e.message);
+    }
+    res.json({ security_events: secEvents, auth_events: authEvents, daily });
   } catch (err) {
     console.error(`GET /api/ip/${req.params.ip}/events error:`, err);
     res.status(500).json({ error: err.message });
