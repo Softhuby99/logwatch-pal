@@ -179,10 +179,36 @@ const IpActivityChart = ({ events, dailyFallback = [] }: Props) => {
     };
   }, [preset, pickedDate]);
 
-  const chartData = useMemo(
-    () => buildBuckets(events, fromMs, toMs, granularity),
-    [events, fromMs, toMs, granularity]
-  );
+  const chartData = useMemo(() => {
+    const base = buildBuckets(events, fromMs, toMs, granularity);
+    const hasEventData = base.some(
+      (r) =>
+        r["Brute Force"] || r["Auth Failures"] || r["Port Scan"] ||
+        r.Bans || r.Unbans || r["Crawl/Probe"]
+    );
+    // Fallback: keine Roh-Events → fülle Tagesbuckets aus ip_daily_summary
+    if (!hasEventData && granularity === "day" && dailyFallback.length > 0) {
+      const byDate = new Map<string, DailyFallbackRow>();
+      dailyFallback.forEach((d) => {
+        if (d?.summary_date) byDate.set(String(d.summary_date).slice(0, 10), d);
+      });
+      return base.map((row) => {
+        const isoDate = row.iso.slice(0, 10);
+        const d = byDate.get(isoDate);
+        if (!d) return row;
+        const auth = Number(d.auth_failed || 0);
+        const sec = Number(d.security_events || 0);
+        const total = Number(d.total_events || auth + sec);
+        const other = Math.max(0, total - auth - sec);
+        return {
+          ...row,
+          "Auth Failures": row["Auth Failures"] + auth,
+          "Crawl/Probe": row["Crawl/Probe"] + sec + other,
+        };
+      });
+    }
+    return base;
+  }, [events, fromMs, toMs, granularity, dailyFallback]);
 
   const totals = useMemo(() => {
     return chartData.reduce(
