@@ -381,17 +381,22 @@ app.get("/api/auth-timeline", async (_req, res) => {
   try {
     const [rows] = await pool.query(`
       SELECT
+        DATE_FORMAT(event_time, '%Y-%m-%d %H:00:00') as bucket_start,
         DATE_FORMAT(event_time, '%H:00') as hour,
         SUM(CASE WHEN login_type IN ('smtp') THEN 1 ELSE 0 END) as smtp,
         SUM(CASE WHEN login_type IN ('imap','pop3') THEN 1 ELSE 0 END) as imap
       FROM auth_events
       WHERE auth_status = 'failed'
-        AND event_time > NOW() - INTERVAL 24 HOUR
-      GROUP BY DATE_FORMAT(event_time, '%H:00')
-      ORDER BY hour ASC
+        AND event_time >= DATE_SUB(DATE_FORMAT(NOW(), '%Y-%m-%d %H:00:00'), INTERVAL 23 HOUR)
+        AND event_time < DATE_ADD(DATE_FORMAT(NOW(), '%Y-%m-%d %H:00:00'), INTERVAL 1 HOUR)
+      GROUP BY bucket_start, hour
+      ORDER BY bucket_start ASC
     `);
     res.json(rows.map(r => ({
       hour: r.hour,
+      bucket_start: r.bucket_start instanceof Date
+        ? r.bucket_start.toISOString()
+        : String(r.bucket_start),
       smtp: Number(r.smtp || 0),
       imap: Number(r.imap || 0),
     })));
@@ -405,28 +410,37 @@ app.get("/api/auth-timeline", async (_req, res) => {
 // Query: ?hour=HH:00 [&type=smtp|imap]
 app.get("/api/auth-events/by-hour", async (req, res) => {
   try {
+    const bucketStartRaw = String(req.query.bucket_start || "").trim();
     const hour = String(req.query.hour || "");
-    if (!/^\d{2}:00$/.test(hour)) {
-      return res.status(400).json({ error: "hour must be HH:00" });
+    const bucketStart = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:00:00(?:\.\d{3}Z)?$/.test(bucketStartRaw)
+      ? bucketStartRaw.replace("T", " ").replace(/\.\d{3}Z$/, "")
+      : "";
+    if (!bucketStart && !/^\d{2}:00$/.test(hour)) {
+      return res.status(400).json({ error: "bucket_start or hour must be provided" });
     }
     const type = String(req.query.type || "all");
     let typeFilter = "";
     if (type === "smtp") typeFilter = "AND login_type = 'smtp'";
     else if (type === "imap") typeFilter = "AND login_type IN ('imap','pop3')";
 
-    // NOTE: use 25h window (not 24h) so the oldest bar of the rolling 24h
-    // chart stays clickable even after the window has slid forward by a few
-    // minutes between render and click. Otherwise the leftmost hour bucket
-    // returns 0 events.
+    const params = [];
+    let timeFilter = "";
+    if (bucketStart) {
+      timeFilter = "AND event_time >= ? AND event_time < DATE_ADD(?, INTERVAL 1 HOUR)";
+      params.push(bucketStart, bucketStart);
+    } else {
+      timeFilter = "AND event_time >= DATE_SUB(DATE_FORMAT(NOW(), '%Y-%m-%d %H:00:00'), INTERVAL 23 HOUR) AND event_time < DATE_ADD(DATE_FORMAT(NOW(), '%Y-%m-%d %H:00:00'), INTERVAL 1 HOUR) AND DATE_FORMAT(event_time, '%H:00') = ?";
+      params.push(hour);
+    }
+
     const [events] = await pool.query(
       `SELECT * FROM auth_events
        WHERE auth_status = 'failed'
-         AND event_time > NOW() - INTERVAL 25 HOUR
-         AND DATE_FORMAT(event_time, '%H:00') = ?
+         ${timeFilter}
          ${typeFilter}
        ORDER BY event_time DESC
        LIMIT 500`,
-      [hour]
+      params
     );
     const byIp = {};
     for (const e of events) {
@@ -443,7 +457,7 @@ app.get("/api/auth-events/by-hour", async (req, res) => {
       login_types: [...r.login_types],
       users: [...r.users].slice(0, 5),
     })).sort((a, b) => b.count - a.count);
-    res.json({ hour, type, events, by_ip: ips });
+    res.json({ hour: bucketStart ? bucketStart.slice(11, 16) : hour, bucket_start: bucketStart || null, type, events, by_ip: ips });
   } catch (err) {
     console.error("GET /api/auth-events/by-hour error:", err);
     res.status(500).json({ error: err.message });
