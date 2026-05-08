@@ -10,6 +10,7 @@ import { DrilldownSheet } from "./DrilldownSheet";
 const chartConfig = {
   smtp: { label: "SMTP", color: "hsl(0 84% 60%)" },
   imap: { label: "IMAP", color: "hsl(217 91% 60%)" },
+  other: { label: "Sonstige", color: "hsl(142 71% 45%)" },
 };
 
 const AuthTimeline = () => {
@@ -65,6 +66,10 @@ const AuthTimeline = () => {
                   <stop offset="0%" stopColor="hsl(217 91% 60%)" stopOpacity={0.3} />
                   <stop offset="100%" stopColor="hsl(217 91% 60%)" stopOpacity={0} />
                 </linearGradient>
+                <linearGradient id="otherGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="hsl(142 71% 45%)" stopOpacity={0.28} />
+                  <stop offset="100%" stopColor="hsl(142 71% 45%)" stopOpacity={0} />
+                </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(217 32% 17%)" />
               <XAxis dataKey="hour" tick={{ fontSize: 10, fill: "hsl(215 20% 55%)" }} interval={3} />
@@ -72,6 +77,7 @@ const AuthTimeline = () => {
               <ChartTooltip content={<ChartTooltipContent />} />
               <Area type="monotone" dataKey="smtp" stroke="hsl(0 84% 60%)" fill="url(#smtpGrad)" strokeWidth={2} />
               <Area type="monotone" dataKey="imap" stroke="hsl(217 91% 60%)" fill="url(#imapGrad)" strokeWidth={2} />
+              <Area type="monotone" dataKey="other" stroke="hsl(142 71% 45%)" fill="url(#otherGrad)" strokeWidth={2} />
             </AreaChart>
           </ChartContainer>
           <p className="mt-1 text-[10px] text-muted-foreground/70 font-mono">
