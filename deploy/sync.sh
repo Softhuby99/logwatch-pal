@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Pull latest dashboard code from git and rebuild the API container.
+# Pull latest dashboard code from git and rebuild the API + dashboard containers.
 # Run on the log server: cd /opt/dashboard && bash deploy/sync.sh
 set -euo pipefail
 
@@ -15,9 +15,9 @@ echo "[sync] current commit: $(git rev-parse --short HEAD) ($(git log -1 --prett
 
 cd "$REPO_DIR/deploy"
 
-echo "[sync] rebuilding api (no cache) and forcing recreate"
-docker compose build --no-cache api
-docker compose up -d --force-recreate api
+echo "[sync] rebuilding api + dashboard (no cache) and forcing recreate"
+docker compose build --no-cache api dashboard
+docker compose up -d --force-recreate api dashboard
 
 # Poll until /api/version answers (or give up after 30s and dump logs)
 echo "[sync] waiting for API to come up…"
