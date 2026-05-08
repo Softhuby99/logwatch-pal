@@ -265,43 +265,72 @@ app.get("/api/ip-stats-7d", async (_req, res) => {
 
 // ── Aggressive IPs 30 Days (View + enrichment + risk) ───────
 app.get("/api/aggressive-ips-30d", async (_req, res) => {
+  const mapRow = (r) => ({
+    ...r,
+    total_events: Number(r.total_events || 0),
+    total_bans: Number(r.total_bans || 0),
+    total_auth_failures: Number(r.total_auth_failures || 0),
+    risk_score: Number(r.risk_score || 0),
+  });
   try {
-    const [rows] = await pool.query(`
-      SELECT
-        v.ip,
-        v.treffer as total_events,
-        v.level as last_alert_level,
-        v.quelle as last_source_component,
-        v.grund as last_event_type,
-        v.konto as last_username,
-        v.last_seen,
-        v.letzte_meldung as last_message,
-        e.country,
-        e.asn,
-        e.org_name,
-        e.ptr,
-        COALESCE(r.score, 0) as risk_score,
-        COALESCE(r.risk_level, 'LOW') as risk_level,
-        s.total_bans,
-        s.total_auth_failures,
-        s.current_status,
-        s.last_target_email,
-        s.last_destination_port,
-        s.last_destination_service
-      FROM vw_top_aggressive_external_ips_30d_v3 v
-      LEFT JOIN ip_enrichment e ON v.ip = e.ip
-      LEFT JOIN ip_risk_score r ON v.ip = r.ip
-      LEFT JOIN ip_summary s ON v.ip = s.ip
-      ORDER BY COALESCE(r.score, 0) DESC
-      LIMIT 100
-    `);
-    res.json(rows.map(r => ({
-      ...r,
-      total_events: Number(r.total_events),
-      total_bans: Number(r.total_bans || 0),
-      total_auth_failures: Number(r.total_auth_failures || 0),
-      risk_score: Number(r.risk_score),
-    })));
+    let rows = [];
+    // 1) Primärquelle: vorhandene View
+    try {
+      const [viewRows] = await pool.query(`
+        SELECT
+          v.ip,
+          v.treffer as total_events,
+          v.level as last_alert_level,
+          v.quelle as last_source_component,
+          v.grund as last_event_type,
+          v.konto as last_username,
+          v.last_seen,
+          v.letzte_meldung as last_message,
+          e.country, e.asn, e.org_name, e.ptr,
+          COALESCE(r.score, 0) as risk_score,
+          COALESCE(r.risk_level, 'LOW') as risk_level,
+          s.total_bans, s.total_auth_failures, s.current_status,
+          s.last_target_email, s.last_destination_port, s.last_destination_service
+        FROM vw_top_aggressive_external_ips_30d_v3 v
+        LEFT JOIN ip_enrichment e ON v.ip = e.ip
+        LEFT JOIN ip_risk_score r ON v.ip = r.ip
+        LEFT JOIN ip_summary s ON v.ip = s.ip
+        ORDER BY COALESCE(r.score, 0) DESC
+        LIMIT 100
+      `);
+      rows = viewRows;
+    } catch (viewErr) {
+      console.warn("[aggressive-ips-30d] view query failed, falling back:", viewErr.message);
+    }
+
+    // 2) Fallback: direkter Aggregat-Query, wenn View leer oder fehlt
+    if (!rows || rows.length === 0) {
+      const [fbRows] = await pool.query(`
+        SELECT
+          s.ip,
+          s.total_events,
+          s.last_alert_level,
+          s.last_source_component,
+          s.last_event_type,
+          s.last_username,
+          s.last_seen,
+          NULL as last_message,
+          e.country, e.asn, e.org_name, e.ptr,
+          COALESCE(r.score, 0) as risk_score,
+          COALESCE(r.risk_level, 'LOW') as risk_level,
+          s.total_bans, s.total_auth_failures, s.current_status,
+          s.last_target_email, s.last_destination_port, s.last_destination_service
+        FROM ip_summary s
+        LEFT JOIN ip_enrichment e ON s.ip = e.ip
+        LEFT JOIN ip_risk_score r ON s.ip = r.ip
+        WHERE s.last_seen > NOW() - INTERVAL 30 DAY
+          AND COALESCE(e.ip_scope, 'external') = 'external'
+        ORDER BY COALESCE(r.score, 0) DESC, s.total_events DESC
+        LIMIT 100
+      `);
+      rows = fbRows;
+    }
+    res.json(rows.map(mapRow));
   } catch (err) {
     console.error("GET /api/aggressive-ips-30d error:", err);
     res.status(500).json({ error: err.message });
