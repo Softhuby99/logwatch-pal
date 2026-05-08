@@ -259,7 +259,7 @@ const IpDetailView = ({ ip, embedded = false }: Props) => {
       <BanTimeline intervals={ban_intervals} compact={embedded} events={events} />
 
       {/* Aktivität (24h / 7T / 30T / 90T / einzelnes Datum) */}
-      <IpActivityChart events={events} />
+      <IpActivityChart events={events} dailyFallback={eventsQ.data?.daily ?? []} />
 
       {/* Top Reasons Bar Chart */}
       {by_type.length > 0 && (
