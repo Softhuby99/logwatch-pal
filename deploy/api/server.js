@@ -58,7 +58,7 @@ app.get("/api/ssh/pubkey", (_req, res) => {
 
 // Version marker — bump on each meaningful change so we can confirm
 // the running container actually has the new code.
-const API_VERSION = "0.6.2-auth-timeline-fix";
+const API_VERSION = "0.6.3-auth-debug";
 app.get("/api/version", (_req, res) => res.json({ version: API_VERSION }));
 console.log(`[startup] API version ${API_VERSION}`);
 
@@ -414,6 +414,47 @@ app.get("/api/auth-timeline", async (_req, res) => {
     })));
   } catch (err) {
     console.error("GET /api/auth-timeline error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── DEBUG: auth_events Inhalte verstehen ────────────────────
+app.get("/api/auth-debug", async (_req, res) => {
+  try {
+    const out = {};
+    const [cols] = await pool.query(`SHOW COLUMNS FROM auth_events`);
+    out.columns = cols.map(c => c.Field);
+    const [[total]] = await pool.query(`SELECT COUNT(*) as c FROM auth_events`);
+    out.total_rows = Number(total.c);
+    const [[h24]] = await pool.query(
+      `SELECT COUNT(*) as c FROM auth_events WHERE event_time > NOW() - INTERVAL 24 HOUR`
+    );
+    out.rows_last_24h = Number(h24.c);
+    const [[matched]] = await pool.query(
+      `SELECT COUNT(*) as c FROM auth_events
+       WHERE event_time > NOW() - INTERVAL 24 HOUR AND ${AUTH_FAILURE_WHERE}`
+    );
+    out.matched_failure_filter_24h = Number(matched.c);
+    const tryDistinct = async (col) => {
+      try {
+        const [rows] = await pool.query(
+          `SELECT \`${col}\` as v, COUNT(*) as c FROM auth_events
+           WHERE event_time > NOW() - INTERVAL 24 HOUR
+           GROUP BY \`${col}\` ORDER BY c DESC LIMIT 10`
+        );
+        return rows.map(r => ({ value: r.v, count: Number(r.c) }));
+      } catch (e) { return { error: e.message }; }
+    };
+    out.distinct_auth_status = await tryDistinct("auth_status");
+    out.distinct_login_type = await tryDistinct("login_type");
+    out.distinct_normalized_reason = await tryDistinct("normalized_reason");
+    const [sample] = await pool.query(
+      `SELECT * FROM auth_events ORDER BY event_time DESC LIMIT 3`
+    );
+    out.sample = sample;
+    res.json(out);
+  } catch (err) {
+    console.error("GET /api/auth-debug error:", err);
     res.status(500).json({ error: err.message });
   }
 });
