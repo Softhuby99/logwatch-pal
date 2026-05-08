@@ -43,6 +43,14 @@ interface IpDetailApi {
 interface IpEventsApi {
   security_events: SecurityEvent[];
   auth_events: AuthEvent[];
+  daily?: Array<{
+    summary_date: string;
+    auth_failed?: number;
+    security_events?: number;
+    total_events?: number;
+    crit_events?: number;
+    warn_events?: number;
+  }>;
 }
 
 interface Props {
