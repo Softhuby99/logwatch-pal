@@ -24,9 +24,10 @@ const AuthTimeline = () => {
   // drilldown that queries a real hour with zero events.
   const chartData = live ? (data ?? []) : authFailureTimeline;
 
-  const [sheet, setSheet] = useState<{ open: boolean; hour: string | null }>({
+  const [sheet, setSheet] = useState<{ open: boolean; hour: string | null; bucketStart: string | null }>({
     open: false,
     hour: null,
+    bucketStart: null,
   });
 
   const handleClick = (e: any) => {
@@ -34,7 +35,9 @@ const AuthTimeline = () => {
     // to inspect for that hour.
     if (!live) return;
     const hour = e?.activeLabel as string | undefined;
-    if (hour) setSheet({ open: true, hour });
+    const payloadRow = e?.activePayload?.[0]?.payload;
+    const bucketStart = payloadRow?.bucket_start as string | undefined;
+    if (hour) setSheet({ open: true, hour, bucketStart: bucketStart ?? null });
   };
 
   return (
@@ -84,7 +87,9 @@ const AuthTimeline = () => {
         onOpenChange={(v) => setSheet((s) => ({ ...s, open: v }))}
         title="Auth Failures · Stundenfenster"
         subtitle={sheet.hour ? `Stunde ${sheet.hour} (letzte 24h)` : undefined}
-        endpoint={sheet.hour ? `/auth-events/by-hour?hour=${encodeURIComponent(sheet.hour)}` : null}
+        endpoint={sheet.hour
+          ? `/auth-events/by-hour?hour=${encodeURIComponent(sheet.hour)}${sheet.bucketStart ? `&bucket_start=${encodeURIComponent(sheet.bucketStart)}` : ""}`
+          : null}
       />
     </>
   );
