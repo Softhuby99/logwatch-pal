@@ -58,7 +58,7 @@ app.get("/api/ssh/pubkey", (_req, res) => {
 
 // Version marker — bump on each meaningful change so we can confirm
 // the running container actually has the new code.
-const API_VERSION = "0.6.4-fixes";
+const API_VERSION = "0.6.5-auth-success-chart";
 app.get("/api/version", (_req, res) => res.json({ version: API_VERSION }));
 console.log(`[startup] API version ${API_VERSION}`);
 

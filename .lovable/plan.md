@@ -1,79 +1,53 @@
-# Reparaturplan für die leeren Ansichten
+# Ziel
+Die leeren Ansichten und der 502-Fehler werden nicht weiter per Trial-and-Error behandelt, sondern in einer festen Reihenfolge: erst Deployment-Stand korrigieren, dann die 3 betroffenen Datenpfade absichern, danach gezielt validieren.
 
-## Ziel
-Die drei Fehlerbilder werden systematisch behoben und jeweils mit echten API-Antworten verifiziert:
-1. **Auth Failures – Letzte 24h** bleibt leer
-2. **Top aggressive external IPs (30 Days)** bleibt leer
-3. **IP-Detail-Historie** zeigt für `80.187.83.199` keine Aktivität, obwohl `ip_summary` Events meldet
+# Was ich konkret umsetzen werde
+1. **Deployment-Stand eindeutig machen**
+   - Sicherstellen, dass API und Dashboard dieselbe aktuelle Version ausliefern.
+   - Einen klaren Prüfschritt einbauen, damit sofort sichtbar ist, ob auf dem Zielsystem noch ein altes Image läuft.
+   - Den 502-Pfad mit einer robusteren Start-/Health-Prüfung absichern, damit Nginx nicht gegen einen veralteten oder nicht sauber gestarteten Upstream läuft.
 
-## Vorgehen
+2. **`/api/auth-timeline` datenfest machen**
+   - Die Failure-Erkennung für `auth_events` an echte Daten angleichen, statt nur auf die bisherigen String-Muster zu vertrauen.
+   - Die 24h-Ansicht weiterhin lückenlos mit 24 Buckets liefern, auch wenn nur wenige oder anders normalisierte Events vorhanden sind.
+   - Falls keine Auth-Fehler existieren, soll die Route sauber `[]`/Nullwerte liefern statt einen irreführenden Zwischenzustand.
 
-### 1) Deployment- und Versionskonsistenz absichern
-- Die API liefert im Code bereits `0.6.3-auth-debug`, auf deinem Server lief aber zuletzt `0.6.0-integrations`.
-- Ich baue deshalb zuerst eine klare Versionskontrolle ein bzw. nutze sie konsequent, damit wir sofort sehen, ob wirklich der neue API-Container aktiv ist.
-- Außerdem prüfe ich die betroffenen Endpunkte direkt statt nur die Oberfläche.
+3. **`/api/aggressive-ips-30d` stabilisieren**
+   - Den bestehenden Fallback nicht nur bei SQL-Fehlern, sondern auch bei unbrauchbaren/teilweisen View-Ergebnissen robust machen.
+   - Sicherstellen, dass die Liste aus `ip_summary`/Enrichment/Risk zuverlässig befüllt wird, wenn die Spezial-View leer oder inkonsistent ist.
 
-**Abnahme:**
-- `/api/version` zeigt die neue Version
-- `/api/auth-debug` ist erreichbar
-- die betroffenen API-Routen liefern JSON statt HTML oder alte Responses
+4. **IP-Aktivitätschart für `80.187.83.199` korrigieren**
+   - Die Chart-Logik so erweitern, dass nicht nur Auth-Fehler, sondern auch **Auth-Erfolge** als Aktivität sichtbar werden.
+   - Dadurch erscheinen IPs mit echten Login-Events in „Aktivität · letzte 30 Tage · täglich“, auch wenn keine Security-Events oder Bans vorliegen.
+   - Die Event-Timeline bleibt dabei getrennt und korrekt klassifiziert.
 
-### 2) Auth-Timeline datenbasiert reparieren
-- Ich prüfe die echten Werte aus `auth_events` über den Debug-Endpunkt und gleiche den Filter für Fehlanmeldungen darauf ab.
-- Danach passe ich die Klassifizierung für SMTP / IMAP / Sonstige so an, dass sie zu deinen realen `login_type`- und Fehlerwerten passt.
-- Zusätzlich sorge ich dafür, dass die Timeline bei den letzten 24 Stunden auch konsistente Stunden-Buckets liefert, statt nur vorhandene Treffer zurückzugeben.
+5. **Graceful Degradation für API-Antworten**
+   - Kritische Dashboard-Endpunkte so härten, dass sie bei Teilfehlern strukturierte JSON-Antworten statt 500/Crash-Verhalten liefern.
+   - Ziel: Frontend bleibt nutzbar, auch wenn eine Quelle leer ist oder eine View auf dem Server fehlt.
 
-**Abnahme:**
-- `/api/auth-debug` zeigt Treffer in den letzten 24h und die tatsächlich verwendeten Werte
-- `/api/auth-timeline` liefert Datensätze mit `smtp`, `imap`, `other`
-- die Kachel **Auth Failures – Letzte 24h** zeigt wieder echte Daten
-- Drilldown `/api/auth-events/by-hour` funktioniert weiter mit denselben Filtern
+6. **Gezielte End-to-End-Validierung**
+   - Nach der Umsetzung überprüfe ich genau diese Endpunkte:
+     - `/api/version`
+     - `/api/auth-debug`
+     - `/api/auth-timeline`
+     - `/api/aggressive-ips-30d`
+     - `/api/ip/80.187.83.199`
+     - `/api/ip/80.187.83.199/events`
+   - Erwartung:
+     - Version ist aktuell
+     - `auth-debug` existiert
+     - Auth-Timeline liefert valide Buckets
+     - aggressive IPs sind nicht leer
+     - die IP-Aktivität zeigt die vorhandenen 12 Success-Events sichtbar an
 
-### 3) Aggressive-IPs-Ansicht robust gegen leere/veraltete Views machen
-- Aktuell hängt die Route komplett an `vw_top_aggressive_external_ips_30d_v3`.
-- Ich baue einen Fallback ein: wenn die View leer ist oder auf dem Zielsystem nicht brauchbar liefert, wird direkt aus `ip_summary` + `ip_enrichment` + `ip_risk_score` abgefragt.
-- So bleibt die Liste befüllt, auch wenn die View auf der VM abweicht oder veraltet ist.
+# Technische Details
+- **Bereits bestätigt:** Im Code ist `API_VERSION = "0.6.4-fixes"` und die Route `/api/auth-debug` existiert bereits. Dass dein Server `0.6.0-integrations` meldet, ist ein klarer Hinweis auf **altes laufendes Deployment**, nicht auf fehlende Route im aktuellen Code.
+- **Warum die IP-Historie leer bleibt:** Die aktuelle Chart-Klassifikation zählt `auth_success` nicht als Aktivitätsspur. Für eine IP mit 12 erfolgreichen IMAP-Logins gibt es deshalb faktisch sichtbare Events in der Timeline, aber keine Kurve im Aktivitätschart.
+- **Warum 502 zusätzlich auftritt:** Das ist sehr wahrscheinlich ein Proxy/Upstream-Thema auf dem Zielsystem, nicht dieselbe Ursache wie die leeren Widgets. Ich behandle deshalb API-Version und Proxy-Erreichbarkeit getrennt.
 
-**Abnahme:**
-- `/api/aggressive-ips-30d` liefert wieder Einträge
-- die Kachel **Top aggressive external IPs (30 Days)** ist nicht mehr leer
-- Sortierung nach Risiko/Treffern bleibt erhalten
-
-### 4) IP-Detail-Historie von Roh-Events entkoppeln
-- Im aktuellen Code baut die Aktivitätsgrafik ihre Daten nur aus `/api/ip/:ip/events` auf.
-- Für `80.187.83.199` ist aber sehr wahrscheinlich genau das Problem: `ip_summary` kennt die 12 Events, die Detailtabellen `security_events` und `auth_events` liefern sie aber nicht vollständig.
-- Ich stelle die IP-Detailansicht daher auf einen robusteren Datenpfad um:
-  - Detail-Timeline weiterhin aus Roh-Events, wenn vorhanden
-  - Tageshistorie zusätzlich aus `/api/ip/:ip/daily` bzw. `ip_daily_summary`
-  - Fallback, wenn Roh-Events leer sind, aber Tagesaggregate oder Summary vorhanden sind
-- Damit wird die Grafik **Aktivität · letzte 30 Tage · täglich** nicht mehr leer, nur weil die Roh-Events in anderen Tabellen oder nur aggregiert vorliegen.
-
-**Abnahme:**
-- `/api/ip/80.187.83.199` zeigt Summary-Daten
-- `/api/ip/80.187.83.199/events` und `/api/ip/80.187.83.199/daily` werden gegeneinander geprüft
-- die Aktivitätsgrafik zeigt für `80.187.83.199` wieder Tageswerte statt leer zu bleiben
-
-### 5) Gezielte End-to-End-Verifikation statt weiterem Probieren
-Nach den Änderungen prüfe ich die Fehler nicht nur im Code, sondern über feste Kontrollpunkte:
-- `/api/version`
-- `/api/auth-debug`
-- `/api/auth-timeline`
-- `/api/aggressive-ips-30d`
-- `/api/ip/80.187.83.199`
-- `/api/ip/80.187.83.199/events`
-- `/api/ip/80.187.83.199/daily`
-
-Danach prüfe ich die drei betroffenen UI-Bereiche im Dashboard noch einmal gezielt.
-
-## Technische Details
-```text
-Problemklasse A: API-Container auf VM läuft nicht auf dem erwarteten Code-Stand
-Problemklasse B: Auth-Filter / Stundenaggregation passt nicht zu realen auth_events
-Problemklasse C: Aggressive-IP-Liste hängt an einer fragilen DB-View
-Problemklasse D: IP-Aktivitätschart nutzt nur Roh-Events statt vorhandene Tagesaggregate
-```
-
-## Ergebnis nach Umsetzung
-- keine weitere Trial-and-Error-Schleife
-- jede leere Ansicht bekommt einen klaren Datenpfad mit Fallback
-- die betroffene IP `80.187.83.199` wird als Referenzfall für die Verifikation benutzt
+# Ergebnis nach Umsetzung
+Du bekommst eine reproduzierbare Kette statt weiterer Blindversuche:
+- aktuelles Deployment nachweisbar aktiv
+- keine leeren Kernwidgets trotz View-/Datenunterschieden
+- sichtbare Aktivität für IPs mit Login-Erfolgen
+- 502 sauber auf Upstream/Proxy eingegrenzt und abgesichert

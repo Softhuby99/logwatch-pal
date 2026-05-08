@@ -42,6 +42,7 @@ interface ChartRow {
   label: string;
   "Brute Force": number;
   "Auth Failures": number;
+  "Auth Success": number;
   "Port Scan": number;
   Bans: number;
   Unbans: number;
@@ -62,6 +63,7 @@ const classify = (
 ): keyof Omit<ChartRow, "iso" | "label"> | null => {
   if (ev.kind === "ban") return "Bans";
   if (ev.kind === "unban") return "Unbans";
+  if (ev.kind === "auth_success") return "Auth Success";
   if (ev.kind === "auth_failure") {
     return ev.type_label?.toUpperCase().includes("BRUTE")
       ? "Brute Force"
@@ -110,6 +112,7 @@ const buildBuckets = (
       label,
       "Brute Force": 0,
       "Auth Failures": 0,
+      "Auth Success": 0,
       "Port Scan": 0,
       Bans: 0,
       Unbans: 0,
@@ -183,7 +186,7 @@ const IpActivityChart = ({ events, dailyFallback = [] }: Props) => {
     const base = buildBuckets(events, fromMs, toMs, granularity);
     const hasEventData = base.some(
       (r) =>
-        r["Brute Force"] || r["Auth Failures"] || r["Port Scan"] ||
+        r["Brute Force"] || r["Auth Failures"] || r["Auth Success"] || r["Port Scan"] ||
         r.Bans || r.Unbans || r["Crawl/Probe"]
     );
     // Fallback: keine Roh-Events → fülle Tagesbuckets aus ip_daily_summary
@@ -215,17 +218,18 @@ const IpActivityChart = ({ events, dailyFallback = [] }: Props) => {
       (acc, r) => ({
         "Brute Force": acc["Brute Force"] + r["Brute Force"],
         "Auth Failures": acc["Auth Failures"] + r["Auth Failures"],
+        "Auth Success": acc["Auth Success"] + r["Auth Success"],
         "Port Scan": acc["Port Scan"] + r["Port Scan"],
         Bans: acc.Bans + r.Bans,
         Unbans: acc.Unbans + r.Unbans,
         "Crawl/Probe": acc["Crawl/Probe"] + r["Crawl/Probe"],
       }),
-      { "Brute Force": 0, "Auth Failures": 0, "Port Scan": 0, Bans: 0, Unbans: 0, "Crawl/Probe": 0 }
+      { "Brute Force": 0, "Auth Failures": 0, "Auth Success": 0, "Port Scan": 0, Bans: 0, Unbans: 0, "Crawl/Probe": 0 }
     );
   }, [chartData]);
 
   const totalEvents =
-    totals["Brute Force"] + totals["Auth Failures"] + totals["Port Scan"] +
+    totals["Brute Force"] + totals["Auth Failures"] + totals["Auth Success"] + totals["Port Scan"] +
     totals.Bans + totals.Unbans + totals["Crawl/Probe"];
 
   // Smart tick gap je nach Bucket-Anzahl
@@ -306,6 +310,7 @@ const IpActivityChart = ({ events, dailyFallback = [] }: Props) => {
         {([
           ["Brute Force", "bg-red-500"],
           ["Auth Failures", "bg-amber-500"],
+          ["Auth Success", "bg-emerald-400"],
           ["Port Scan", "bg-blue-500"],
           ["Bans", "bg-fuchsia-500"],
           ["Unbans", "bg-emerald-500"],
@@ -332,6 +337,7 @@ const IpActivityChart = ({ events, dailyFallback = [] }: Props) => {
                 {[
                   ["g-act-brute", "hsl(0 84% 60%)"],
                   ["g-act-auth", "hsl(38 92% 50%)"],
+                  ["g-act-success", "hsl(142 71% 55%)"],
                   ["g-act-port", "hsl(217 91% 60%)"],
                   ["g-act-ban", "hsl(290 70% 55%)"],
                   ["g-act-unban", "hsl(142 71% 45%)"],
@@ -367,6 +373,7 @@ const IpActivityChart = ({ events, dailyFallback = [] }: Props) => {
               <Legend wrapperStyle={{ fontSize: 10 }} />
               <Area type="monotone" dataKey="Brute Force" stackId="1" stroke="hsl(0 84% 60%)" fill="url(#g-act-brute)" strokeWidth={1.5} />
               <Area type="monotone" dataKey="Auth Failures" stackId="1" stroke="hsl(38 92% 50%)" fill="url(#g-act-auth)" strokeWidth={1.5} />
+              <Area type="monotone" dataKey="Auth Success" stackId="1" stroke="hsl(142 71% 55%)" fill="url(#g-act-success)" strokeWidth={1.5} />
               <Area type="monotone" dataKey="Port Scan" stackId="1" stroke="hsl(217 91% 60%)" fill="url(#g-act-port)" strokeWidth={1.5} />
               <Area type="monotone" dataKey="Bans" stackId="1" stroke="hsl(290 70% 55%)" fill="url(#g-act-ban)" strokeWidth={1.5} />
               <Area type="monotone" dataKey="Unbans" stackId="1" stroke="hsl(142 71% 45%)" fill="url(#g-act-unban)" strokeWidth={1.5} />
