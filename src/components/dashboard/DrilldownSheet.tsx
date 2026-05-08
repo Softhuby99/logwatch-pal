@@ -66,7 +66,7 @@ export const DrilldownSheet = ({ open, onOpenChange, title, subtitle, endpoint }
           const txt = await r.text().catch(() => "");
           if (r.status === 404) {
             throw new Error(
-              `Endpoint nicht gefunden (HTTP 404).\nDer API-Container kennt diese Route noch nicht – bitte neu bauen:\n  cd /opt/dashboard/deploy && docker compose build api && docker compose up -d api`
+              `Endpoint nicht gefunden (HTTP 404).\nDer API-Container kennt diese Route noch nicht – bitte beide Container neu bauen:\n  cd /opt/dashboard/deploy && docker compose build --no-cache api dashboard && docker compose up -d --force-recreate api dashboard`
             );
           }
           throw new Error(`HTTP ${r.status}${txt ? ` · ${txt.slice(0, 200)}` : ""}`);

@@ -58,7 +58,7 @@ app.get("/api/ssh/pubkey", (_req, res) => {
 
 // Version marker — bump on each meaningful change so we can confirm
 // the running container actually has the new code.
-const API_VERSION = "0.6.0-integrations";
+const API_VERSION = "0.6.1-auth-bucket-fix";
 app.get("/api/version", (_req, res) => res.json({ version: API_VERSION }));
 console.log(`[startup] API version ${API_VERSION}`);
 
@@ -72,6 +72,7 @@ const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 10,
   charset: "utf8mb4",
+  dateStrings: true,
 });
 
 // Health check
@@ -393,10 +394,8 @@ app.get("/api/auth-timeline", async (_req, res) => {
       ORDER BY bucket_start ASC
     `);
     res.json(rows.map(r => ({
-      hour: r.hour,
-      bucket_start: r.bucket_start instanceof Date
-        ? r.bucket_start.toISOString()
-        : String(r.bucket_start),
+      hour: String(r.hour),
+      bucket_start: String(r.bucket_start),
       smtp: Number(r.smtp || 0),
       imap: Number(r.imap || 0),
     })));
@@ -412,8 +411,8 @@ app.get("/api/auth-events/by-hour", async (req, res) => {
   try {
     const bucketStartRaw = String(req.query.bucket_start || "").trim();
     const hour = String(req.query.hour || "");
-    const bucketStart = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:00:00(?:\.\d{3}Z)?$/.test(bucketStartRaw)
-      ? bucketStartRaw.replace("T", " ").replace(/\.\d{3}Z$/, "")
+    const bucketStart = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:00:00$/.test(bucketStartRaw)
+      ? bucketStartRaw.replace("T", " ")
       : "";
     if (!bucketStart && !/^\d{2}:00$/.test(hour)) {
       return res.status(400).json({ error: "bucket_start or hour must be provided" });
