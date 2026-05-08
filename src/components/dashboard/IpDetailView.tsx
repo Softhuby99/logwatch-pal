@@ -165,7 +165,7 @@ const IpDetailView = ({ ip, embedded = false }: Props) => {
     [ip]
   );
   const eventsQ = useApiData<IpEventsApi>(
-    () => fetchIpEvents<IpEventsApi>(ip, { security_events: [], auth_events: [] }),
+    () => fetchIpEvents<IpEventsApi>(ip, { security_events: [], auth_events: [], daily: [] }),
     [ip]
   );
 
