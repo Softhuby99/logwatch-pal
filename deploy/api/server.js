@@ -62,6 +62,17 @@ const API_VERSION = "0.6.1-auth-bucket-fix";
 app.get("/api/version", (_req, res) => res.json({ version: API_VERSION }));
 console.log(`[startup] API version ${API_VERSION}`);
 
+const AUTH_FAILURE_WHERE = `(
+  LOWER(COALESCE(auth_status, '')) = 'failed'
+  OR UPPER(COALESCE(normalized_reason, '')) LIKE '%AUTH_FAILED%'
+  OR LOWER(COALESCE(raw_reason, '')) LIKE '%auth%fail%'
+  OR LOWER(COALESCE(message, '')) LIKE '%auth%fail%'
+  OR LOWER(COALESCE(message, '')) LIKE '%login%fail%'
+)`;
+
+const SMTP_LOGIN_WHERE = "LOWER(COALESCE(login_type, '')) IN ('smtp', 'submission', 'smtps')";
+const IMAP_LOGIN_WHERE = "LOWER(COALESCE(login_type, '')) IN ('imap', 'imaps', 'pop3', 'pop3s')";
+
 // ── DB pool ──────────────────────────────────────────────────
 const pool = mysql.createPool({
   host: process.env.MARIADB_HOST || "host.docker.internal",
@@ -110,7 +121,7 @@ app.get("/api/stats", async (_req, res) => {
         SUM(event_time > NOW() - INTERVAL 24 HOUR) as h24,
         SUM(event_time > NOW() - INTERVAL 7 DAY) as d7,
         SUM(event_time > NOW() - INTERVAL 30 DAY) as d30
-      FROM auth_events WHERE auth_status = 'failed'
+      FROM auth_events WHERE ${AUTH_FAILURE_WHERE}
     `);
     const [[csRow]] = await pool.query(`
       SELECT
@@ -384,10 +395,11 @@ app.get("/api/auth-timeline", async (_req, res) => {
       SELECT
         DATE_FORMAT(event_time, '%Y-%m-%d %H:00:00') as bucket_start,
         DATE_FORMAT(event_time, '%H:00') as hour,
-        SUM(CASE WHEN login_type IN ('smtp') THEN 1 ELSE 0 END) as smtp,
-        SUM(CASE WHEN login_type IN ('imap','pop3') THEN 1 ELSE 0 END) as imap
+        SUM(CASE WHEN ${SMTP_LOGIN_WHERE} THEN 1 ELSE 0 END) as smtp,
+        SUM(CASE WHEN ${IMAP_LOGIN_WHERE} THEN 1 ELSE 0 END) as imap,
+        SUM(CASE WHEN NOT (${SMTP_LOGIN_WHERE}) AND NOT (${IMAP_LOGIN_WHERE}) THEN 1 ELSE 0 END) as other
       FROM auth_events
-      WHERE auth_status = 'failed'
+      WHERE ${AUTH_FAILURE_WHERE}
         AND event_time >= DATE_SUB(DATE_FORMAT(NOW(), '%Y-%m-%d %H:00:00'), INTERVAL 23 HOUR)
         AND event_time < DATE_ADD(DATE_FORMAT(NOW(), '%Y-%m-%d %H:00:00'), INTERVAL 1 HOUR)
       GROUP BY bucket_start, hour
@@ -398,6 +410,7 @@ app.get("/api/auth-timeline", async (_req, res) => {
       bucket_start: String(r.bucket_start),
       smtp: Number(r.smtp || 0),
       imap: Number(r.imap || 0),
+        other: Number(r.other || 0),
     })));
   } catch (err) {
     console.error("GET /api/auth-timeline error:", err);
@@ -419,8 +432,9 @@ app.get("/api/auth-events/by-hour", async (req, res) => {
     }
     const type = String(req.query.type || "all");
     let typeFilter = "";
-    if (type === "smtp") typeFilter = "AND login_type = 'smtp'";
-    else if (type === "imap") typeFilter = "AND login_type IN ('imap','pop3')";
+    if (type === "smtp") typeFilter = `AND ${SMTP_LOGIN_WHERE}`;
+    else if (type === "imap") typeFilter = `AND ${IMAP_LOGIN_WHERE}`;
+    else if (type === "other") typeFilter = `AND NOT (${SMTP_LOGIN_WHERE}) AND NOT (${IMAP_LOGIN_WHERE})`;
 
     const params = [];
     let timeFilter = "";
@@ -434,7 +448,7 @@ app.get("/api/auth-events/by-hour", async (req, res) => {
 
     const [events] = await pool.query(
       `SELECT * FROM auth_events
-       WHERE auth_status = 'failed'
+       WHERE ${AUTH_FAILURE_WHERE}
          ${timeFilter}
          ${typeFilter}
        ORDER BY event_time DESC
