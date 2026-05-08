@@ -20,8 +20,19 @@ import type { IpTimelineEvent } from "@/lib/ipTimeline";
 
 type RangePreset = "24h" | "7d" | "30d" | "90d" | "day";
 
+interface DailyFallbackRow {
+  summary_date: string;
+  auth_failed?: number;
+  security_events?: number;
+  total_events?: number;
+  crit_events?: number;
+  warn_events?: number;
+}
+
 interface Props {
   events: IpTimelineEvent[];
+  /** Wird verwendet, wenn keine Roh-Events vorliegen (z.B. Events nur in Aggregat-Tabelle). */
+  dailyFallback?: DailyFallbackRow[];
 }
 
 interface ChartRow {
