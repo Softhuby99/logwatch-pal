@@ -141,7 +141,7 @@ const fmtTooltip = (iso: string, granularity: "hour" | "day") => {
   }
 };
 
-const IpActivityChart = ({ events }: Props) => {
+const IpActivityChart = ({ events, dailyFallback = [] }: Props) => {
   const [preset, setPreset] = useState<RangePreset>("30d");
   const [pickedDate, setPickedDate] = useState<Date | undefined>(undefined);
   const [calendarOpen, setCalendarOpen] = useState(false);
