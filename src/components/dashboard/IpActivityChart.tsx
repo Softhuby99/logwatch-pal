@@ -42,6 +42,7 @@ interface ChartRow {
   label: string;
   "Brute Force": number;
   "Auth Failures": number;
+  "Auth Success": number;
   "Port Scan": number;
   Bans: number;
   Unbans: number;
