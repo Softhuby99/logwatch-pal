@@ -38,6 +38,7 @@ export interface GeoAttackRow {
 
 export interface AuthTimelineRow {
   hour: string;
+  bucket_start?: string;
   smtp: number;
   imap: number;
 }
