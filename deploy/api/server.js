@@ -58,7 +58,7 @@ app.get("/api/ssh/pubkey", (_req, res) => {
 
 // Version marker — bump on each meaningful change so we can confirm
 // the running container actually has the new code.
-const API_VERSION = "0.6.0-integrations";
+const API_VERSION = "0.6.1-auth-bucket-fix";
 app.get("/api/version", (_req, res) => res.json({ version: API_VERSION }));
 console.log(`[startup] API version ${API_VERSION}`);
 
@@ -72,6 +72,7 @@ const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 10,
   charset: "utf8mb4",
+  dateStrings: true,
 });
 
 // Health check
