@@ -1,3 +1,8 @@
+# Docker's embedded DNS at 127.0.0.11. Without this nginx resolves upstream
+# hostnames ONCE at startup and caches the IP forever — when a container is
+# recreated (new IP) every request becomes 502 Bad Gateway.
+resolver 127.0.0.11 valid=10s ipv6=off;
+
 server {
   listen 80;
   server_name ${HOSTNAME};
@@ -15,7 +20,8 @@ server {
   ssl_prefer_server_ciphers on;
 
   location /api/ {
-    proxy_pass http://api:3001/api/;
+    set $api_upstream http://api:3001;
+    proxy_pass $api_upstream/api/;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -26,13 +32,15 @@ server {
   # /auth/ proxy block so it wins the longest-prefix match (= sign forces
   # exact match).
   location = /auth/callback {
-    proxy_pass http://dashboard:80/auth/callback;
+    set $dashboard_upstream http://dashboard:80;
+    proxy_pass $dashboard_upstream;
     proxy_set_header Host $host;
     proxy_set_header X-Forwarded-Proto https;
   }
 
   location /auth/ {
-    proxy_pass https://sso.servuswir.de:9443/;
+    set $authentik_upstream https://sso.servuswir.de:9443;
+    proxy_pass $authentik_upstream/;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -40,7 +48,8 @@ server {
   }
 
   location / {
-    proxy_pass http://dashboard:80;
+    set $dashboard_upstream http://dashboard:80;
+    proxy_pass $dashboard_upstream;
     proxy_set_header Host $host;
     proxy_set_header X-Forwarded-Proto https;
   }
