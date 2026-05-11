@@ -1,0 +1,20 @@
+sequenceDiagram
+  autonumber
+  participant B as Browser
+  participant N as nginx (proxy)
+  participant S as SPA (Dashboard)
+  participant A as Authentik (sso:9443)
+  participant API as Dashboard-API
+
+  B->>N: GET https://logdash.servuswir.de/
+  N->>S: index.html
+  S->>B: redirect /auth/authorize?code_challenge=...
+  B->>A: GET /application/o/log-dashboard/authorize
+  A-->>B: Login-Seite
+  B->>A: Credentials + MFA
+  A-->>B: 302 /auth/callback?code=...
+  B->>S: /auth/callback
+  S->>A: POST /token (code + verifier)
+  A-->>S: id_token + access_token
+  S->>API: GET /api/stats (Bearer ...)
+  API-->>S: JSON

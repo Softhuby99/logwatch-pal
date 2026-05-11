@@ -1,0 +1,14 @@
+flowchart TD
+  MC[Mailcow<br/>Postfix/Dovecot/nginx]
+  OPN[OPNsense + CrowdSec]
+  F2B[Fail2ban Jails]
+
+  MC -- "syslog" --> LC
+  OPN -- "API/log" --> LC
+  F2B -- "logs" --> LC
+
+  LC[LogCollector Python<br/>Parser · Normalizer · Enricher · Risk-Scorer]
+
+  LC --> DB[(MariaDB logdb<br/>security_events · auth_events<br/>ip_summary · ip_enrichment · ip_risk_score)]
+  DB --> API[Dashboard API<br/>Express]
+  API --> UI[React UI<br/>Dashboard]
