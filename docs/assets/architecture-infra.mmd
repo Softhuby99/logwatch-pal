@@ -1,0 +1,46 @@
+flowchart TB
+  subgraph Internet
+    Browser[Browser]
+  end
+
+  subgraph OPN[OPNsense VM]
+    FW[Firewall + NAT]
+    ACME[ACME Client]
+    CS[CrowdSec]
+  end
+
+  subgraph AUTH[Authentik VM<br/>sso.servuswir.de:9443]
+    AK[Authentik Server]
+  end
+
+  subgraph LSV[LogServer VM]
+    MDB[(MariaDB logdb)]
+    LC[LogCollector Python]
+  end
+
+  subgraph DSV[LogSrv – Docker Host]
+    PROXY[proxy<br/>nginx :80/:443]
+    DASH[dashboard<br/>nginx + React SPA]
+    API[api<br/>Express :3001]
+    PG[(PostgreSQL)]
+    BAK[backup]
+    PROXY --> DASH
+    PROXY --> API
+    API --> PG
+  end
+
+  subgraph SRC[Quellen]
+    MC[Mailcow VM]
+    F2B[Fail2ban Hosts]
+  end
+
+  Browser -->|HTTPS 443| FW
+  FW -->|443| PROXY
+  Browser -.OIDC Redirect.-> AUTH
+  PROXY -.->|/auth proxy| AUTH
+
+  MC -->|syslog| LC
+  CS -->|API| LC
+  F2B -->|SSH tail| LC
+  LC --> MDB
+  API -->|MariaDB<br/>logserver_default| MDB
