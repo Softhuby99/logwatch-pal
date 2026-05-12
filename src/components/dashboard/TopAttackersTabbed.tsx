@@ -9,6 +9,35 @@ import { useIpDetail } from "@/contexts/IpDetailContext";
 import { useApiData } from "@/hooks/useApiData";
 import { fetchTopAttackers } from "@/lib/api";
 import type { AlertLevel, RiskLevel } from "@/types/database";
+import { iso2ToIso3, iso2ToName } from "@/lib/geoAttacks";
+
+const isPrivateIp = (ip: string) =>
+  /^10\./.test(ip) ||
+  /^192\.168\./.test(ip) ||
+  /^172\.(1[6-9]|2\d|3[01])\./.test(ip) ||
+  /^127\./.test(ip);
+
+const flagEmoji = (iso2: string) =>
+  iso2
+    .toUpperCase()
+    .replace(/./g, (c) => String.fromCodePoint(127397 + c.charCodeAt(0)));
+
+const CountryCell = ({ ip, iso2 }: { ip: string; iso2: string | null }) => {
+  if (isPrivateIp(ip)) {
+    return <span className="text-muted-foreground/70">LAN</span>;
+  }
+  if (!iso2) return <span className="text-muted-foreground">??</span>;
+  const code = iso2ToIso3(iso2) ?? iso2.toUpperCase();
+  return (
+    <span
+      className="inline-flex items-center gap-1.5"
+      title={iso2ToName(iso2)}
+    >
+      <span aria-hidden>{flagEmoji(iso2)}</span>
+      <span>{code}</span>
+    </span>
+  );
+};
 
 const levelClass = (lvl: AlertLevel | null) => {
   if (lvl === "CRIT") return "bg-red-500/20 text-red-400 border-red-500/30";
@@ -255,7 +284,9 @@ const TopAttackersTabbed = () => {
                     <TableCell className="px-3 py-2 text-muted-foreground truncate max-w-[160px]" title={row.last_event_type ?? ""}>
                       {row.last_event_type ?? "-"}
                     </TableCell>
-                    <TableCell className="px-3 py-2 text-muted-foreground">{row.country ?? "??"}</TableCell>
+                    <TableCell className="px-3 py-2 text-muted-foreground">
+                      <CountryCell ip={row.ip} iso2={row.country} />
+                    </TableCell>
                     <TableCell className="px-3 py-2 text-muted-foreground truncate max-w-[180px]" title={row.org_name ?? ""}>
                       {row.org_name ?? "unbekannt"}
                     </TableCell>

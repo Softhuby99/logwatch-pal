@@ -439,6 +439,11 @@ export const mockIPEnrichment: IpEnrichment[] = [
   { ip: "3.131.220.121", ip_scope: "external", country: "US", asn: "AS16509", org_name: "Amazon AWS", ptr: null, last_lookup: now },
   { ip: "18.116.101.220", ip_scope: "external", country: "US", asn: "AS16509", org_name: "Amazon AWS", ptr: null, last_lookup: now },
   { ip: "34.193.119.44", ip_scope: "external", country: "US", asn: "AS14618", org_name: "Amazon AWS", ptr: null, last_lookup: now },
+  { ip: "3.129.187.38", ip_scope: "external", country: "US", asn: "AS16509", org_name: "Amazon AWS (us-east-2)", ptr: null, last_lookup: now },
+  { ip: "81.19.216.85", ip_scope: "external", country: "RU", asn: "AS41682", org_name: "PJSC Rostelecom", ptr: null, last_lookup: now },
+  { ip: "89.21.67.184", ip_scope: "external", country: "DE", asn: "AS8881", org_name: "1&1 Versatel Deutschland", ptr: null, last_lookup: now },
+  { ip: "5.255.118.182", ip_scope: "external", country: "RU", asn: "AS13238", org_name: "Yandex.Cloud LLC", ptr: null, last_lookup: now },
+  { ip: "80.187.82.22", ip_scope: "external", country: "DE", asn: "AS3320", org_name: "Deutsche Telekom AG", ptr: null, last_lookup: now },
 ];
 
 // ------------------------------------------------------------
