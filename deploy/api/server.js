@@ -736,6 +736,67 @@ app.get("/api/geo-attacks", async (_req, res) => {
   }
 });
 
+// ── Enrichment Diagnostics ──────────────────────────────────
+// Read-only check: für die aktuellen Top-IPs aus ip_summary prüfen, welche
+// in ip_enrichment fehlen. Liefert auch das tatsächliche Schema von
+// ip_enrichment, um Schema-Drift gegenüber Doku/Collector zu erkennen.
+app.get("/api/diagnostics/enrichment", async (req, res) => {
+  try {
+    const window = String(req.query.window || "24h");
+    const limit = Math.min(parseInt(req.query.limit || "25"), 200);
+    const interval = window === "7d" ? "7 DAY" : window === "30d" ? "30 DAY" : "24 HOUR";
+
+    const [enrCols] = await pool.query(`SHOW COLUMNS FROM ip_enrichment`);
+    const [sumCols] = await pool.query(`SHOW COLUMNS FROM ip_summary`);
+    const [[enrCount]] = await pool.query(`SELECT COUNT(*) as n FROM ip_enrichment`);
+    const [[enrCountry]] = await pool.query(
+      `SELECT COUNT(*) as n FROM ip_enrichment WHERE country IS NOT NULL AND country <> ''`,
+    );
+
+    const [topIps] = await pool.query(
+      `SELECT ip FROM ip_summary
+        WHERE last_seen > NOW() - INTERVAL ${interval}
+        ORDER BY total_events DESC
+        LIMIT ?`,
+      [limit],
+    );
+    const ips = topIps.map((r) => r.ip);
+
+    let enriched = [];
+    let missing = ips;
+    if (ips.length > 0) {
+      const [enrRows] = await pool.query(
+        `SELECT ip, country, asn, org_name, ip_scope, last_lookup
+           FROM ip_enrichment WHERE ip IN (?)`,
+        [ips],
+      );
+      const haveMap = new Map(enrRows.map((r) => [r.ip, r]));
+      enriched = enrRows;
+      missing = ips.filter((ip) => !haveMap.has(ip));
+    }
+
+    res.json({
+      window,
+      ip_enrichment_schema: enrCols.map((c) => c.Field),
+      ip_summary_schema: sumCols.map((c) => c.Field),
+      ip_enrichment_total_rows: Number(enrCount.n || 0),
+      ip_enrichment_with_country: Number(enrCountry.n || 0),
+      top_ips_in_window: ips.length,
+      enriched_count: enriched.length,
+      missing_count: missing.length,
+      missing_ips: missing,
+      enriched_sample: enriched.slice(0, 10),
+      hint:
+        missing.length > 0
+          ? "Top-IPs fehlen in ip_enrichment. Tools → 'IP Enricher' starten, danach 'Risk-Score' und 'Daily-Summary'."
+          : "Alle Top-IPs sind enriched. Falls UI noch '??' zeigt: Browser-Cache leeren (Strg+Shift+R).",
+    });
+  } catch (err) {
+    console.error("GET /api/diagnostics/enrichment error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Tools / Manual scripts ──────────────────────────────────
 // Whitelist of scripts that can be triggered from the dashboard.
 // Each entry is run from COLLECTOR_ROOT (default /opt/logserver/collector)
