@@ -146,9 +146,62 @@ export const ToolsDialog = ({
 
         <Separator />
 
+        {/* Diagnostics */}
+        <div className="space-y-2">
+          <Label className="text-sm">Diagnose</Label>
+          <div className="flex items-start justify-between gap-3 rounded-md border border-border/60 bg-muted/20 p-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium">Enrichment-Lücken prüfen</p>
+              <p className="text-[11px] text-muted-foreground">
+                Listet aktuelle Top-IPs, die in <code>ip_enrichment</code> fehlen
+                (Ursache für „??" in der Spalte Land).
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!!running}
+              onClick={async () => {
+                setRunning("diag_enrichment");
+                setResult(null);
+                setError(null);
+                try {
+                  const res = await fetch(`${API_BASE}/diagnostics/enrichment?window=24h&limit=25`);
+                  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                  const data = await res.json();
+                  setResult({
+                    id: "diag_enrichment",
+                    exit_code: 0,
+                    ok: true,
+                    stdout: JSON.stringify(data, null, 2),
+                    stderr: "",
+                  });
+                } catch (e) {
+                  setError(e instanceof Error ? e.message : String(e));
+                } finally {
+                  setRunning(null);
+                }
+              }}
+            >
+              {running === "diag_enrichment" ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Play className="h-3.5 w-3.5" />
+              )}
+              Prüfen
+            </Button>
+          </div>
+        </div>
+
+        <Separator />
+
         {/* Scripts */}
         <div className="space-y-2">
           <Label className="text-sm">Wartungs-Skripte</Label>
+          <p className="text-[11px] text-muted-foreground">
+            Empfohlene Reihenfolge bei „??"-Anzeige: <strong>IP Enricher</strong> →{" "}
+            <strong>Risk-Score</strong> → <strong>Daily-Summary</strong>.
+          </p>
           <div className="space-y-2">
             {KNOWN_TOOLS.map((t) => (
               <div
