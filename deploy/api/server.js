@@ -797,6 +797,138 @@ app.get("/api/diagnostics/enrichment", async (req, res) => {
   }
 });
 
+// ── Country Backfill (internal, ohne Python-Collector) ──────
+// Lädt fehlende country/asn/org_name für IPs in ip_summary nach,
+// indem ip-api.com/batch (kostenlos, kein Key, 45 req/min, 100 IPs/Batch)
+// abgefragt wird. Schreibt mit INSERT … ON DUPLICATE KEY UPDATE.
+const isPrivateIp = (ip) =>
+  /^10\./.test(ip) ||
+  /^192\.168\./.test(ip) ||
+  /^172\.(1[6-9]|2\d|3[01])\./.test(ip) ||
+  /^127\./.test(ip) ||
+  /^::1$/.test(ip) ||
+  /^fe80:/i.test(ip) ||
+  /^fc00:/i.test(ip);
+
+async function lookupBatch(ips) {
+  // ip-api.com batch endpoint, fields bitmask siehe https://ip-api.com/docs/api:batch
+  // wir holen: status, countryCode, as, isp, org, reverse, query
+  const url = "http://ip-api.com/batch?fields=status,message,countryCode,as,isp,org,reverse,query";
+  const body = JSON.stringify(ips.map((ip) => ({ query: ip })));
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 15000);
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+      signal: ctrl.signal,
+    });
+    if (!res.ok) throw new Error(`ip-api HTTP ${res.status}`);
+    return await res.json();
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+app.post("/api/tools/backfill-country", async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.body?.limit || "100"), 500);
+    const mode = String(req.body?.mode || "all"); // missing | null_country | all
+
+    // 1) Kandidaten-IPs aus ip_summary ermitteln
+    let sql;
+    if (mode === "missing") {
+      sql = `SELECT s.ip FROM ip_summary s
+             LEFT JOIN ip_enrichment e ON s.ip = e.ip
+             WHERE e.ip IS NULL
+             ORDER BY s.last_seen DESC LIMIT ?`;
+    } else if (mode === "null_country") {
+      sql = `SELECT s.ip FROM ip_summary s
+             JOIN ip_enrichment e ON s.ip = e.ip
+             WHERE e.country IS NULL OR e.country = ''
+             ORDER BY s.last_seen DESC LIMIT ?`;
+    } else {
+      sql = `SELECT s.ip FROM ip_summary s
+             LEFT JOIN ip_enrichment e ON s.ip = e.ip
+             WHERE e.ip IS NULL OR e.country IS NULL OR e.country = ''
+             ORDER BY s.last_seen DESC LIMIT ?`;
+    }
+    const [rows] = await pool.query(sql, [limit]);
+    const allIps = rows.map((r) => r.ip);
+    const skipped = allIps.filter(isPrivateIp);
+    const candidates = allIps.filter((ip) => !isPrivateIp(ip));
+
+    if (candidates.length === 0) {
+      return res.json({
+        ok: true, mode, scanned: allIps.length, skipped_private: skipped.length,
+        looked_up: 0, updated: 0, failed: 0, message: "Keine externen IPs zu enrichen.",
+      });
+    }
+
+    // 2) In Batches à 100 anfragen, mit ~1.5s Pause zwischen Batches (45 req/min Limit)
+    let updated = 0, failed = 0;
+    const failures = [];
+    for (let i = 0; i < candidates.length; i += 100) {
+      const batch = candidates.slice(i, i + 100);
+      let results;
+      try {
+        results = await lookupBatch(batch);
+      } catch (e) {
+        failed += batch.length;
+        failures.push({ batch: i / 100, error: e.message });
+        continue;
+      }
+      for (const r of results) {
+        if (r.status !== "success") {
+          failed += 1;
+          continue;
+        }
+        const ip = r.query;
+        const country = (r.countryCode || "").slice(0, 2) || null;
+        const asn = r.as || null;
+        const org = r.org || r.isp || null;
+        const ptr = r.reverse || null;
+        try {
+          await pool.query(
+            `INSERT INTO ip_enrichment (ip, ip_scope, country, asn, org_name, ptr, last_lookup)
+             VALUES (?, 'external', ?, ?, ?, ?, NOW())
+             ON DUPLICATE KEY UPDATE
+               country    = COALESCE(VALUES(country), country),
+               asn        = COALESCE(VALUES(asn), asn),
+               org_name   = COALESCE(VALUES(org_name), org_name),
+               ptr        = COALESCE(VALUES(ptr), ptr),
+               last_lookup = VALUES(last_lookup)`,
+            [ip, country, asn, org, ptr],
+          );
+          updated += 1;
+        } catch (e) {
+          failed += 1;
+          failures.push({ ip, error: e.message });
+        }
+      }
+      if (i + 100 < candidates.length) {
+        await new Promise((r) => setTimeout(r, 1500));
+      }
+    }
+
+    res.json({
+      ok: true,
+      mode,
+      scanned: allIps.length,
+      skipped_private: skipped.length,
+      looked_up: candidates.length,
+      updated,
+      failed,
+      failures: failures.slice(0, 20),
+      message: `${updated} IPs aktualisiert, ${failed} Fehler. Reload mit Strg+Shift+R.`,
+    });
+  } catch (err) {
+    console.error("POST /api/tools/backfill-country error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Tools / Manual scripts ──────────────────────────────────
 // Whitelist of scripts that can be triggered from the dashboard.
 // Each entry is run from COLLECTOR_ROOT (default /opt/logserver/collector)
