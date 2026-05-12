@@ -284,7 +284,9 @@ const TopAttackersTabbed = () => {
                     <TableCell className="px-3 py-2 text-muted-foreground truncate max-w-[160px]" title={row.last_event_type ?? ""}>
                       {row.last_event_type ?? "-"}
                     </TableCell>
-                    <TableCell className="px-3 py-2 text-muted-foreground">{row.country ?? "??"}</TableCell>
+                    <TableCell className="px-3 py-2 text-muted-foreground">
+                      <CountryCell ip={row.ip} iso2={row.country} />
+                    </TableCell>
                     <TableCell className="px-3 py-2 text-muted-foreground truncate max-w-[180px]" title={row.org_name ?? ""}>
                       {row.org_name ?? "unbekannt"}
                     </TableCell>
