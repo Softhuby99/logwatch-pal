@@ -1,142 +1,57 @@
-## Projekt-Dokumentation: LogWatch Dashboard (final)
+## Ziel
 
-Ich erstelle eine vollständige Betriebs- und Installations-Doku als Markdown im Repo unter `docs/`. Die **Gesamtarchitektur** (von dir geliefert) wird vollständig in Kapitel 01 übernommen — sowohl als ASCII-Diagramm (1:1 wie geliefert) als auch erweitert um die Infrastruktur-Ebene (VMs, Container, Auth-Flow) als Mermaid-Diagramm.
+In **Top Angreifer** zeigt die Spalte `land` statt `??`:
 
-### Dokumenten-Struktur
+- **Externe IPs mit Enrichment** → Flagge + **ISO3-Code**, z. B. `🇩🇪 DEU`, `🇷🇺 RUS`
+- **Private/interne IPs** (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 127.0.0.0/8) → Badge `LAN`
+- **Externe IP, kein Mapping** → ISO2 als Fallback (z. B. `XK`)
+- **Keine Daten** → `??`
 
-```
-docs/
-├── README.md                    # Einstieg + Inhaltsverzeichnis
-├── 01-architecture.md           # Gesamt-Architektur (ASCII + Mermaid + PNG)
-├── 02-prerequisites.md          # HW, SW, Netz, DNS, Accounts
-├── 03-installation.md           # Schritt-für-Schritt Neuinstallation
-├── 04-configuration-reference.md# JEDE .env-Variable + Beispiele
-├── 05-certificates.md           # TLS via OPNsense ACME (Erstellung + Verteilung)
-├── 06-authentik-setup.md        # Provider, Application, Scopes, SSO-Sources
-├── 07-opnsense-setup.md         # Firewall-Rules, NAT, ACME, API-User, CrowdSec
-├── 08-ssh-log-collection.md     # SSH-Keys, sudoers, Pfade pro Quelle
-├── 09-logcollector-pipeline.md  # Parser → Normalizer → Enricher → Risk-Scorer
-├── 10-database-schema.md        # MariaDB-Tabellen (security_events, auth_events, …)
-├── 11-operations.md             # Update, Backup/Restore, Logs, Healthchecks
-├── 12-troubleshooting.md        # Symptom → Ursache → Fix
-├── 13-security-checklist.md     # Härtung, Secrets, MFA, DSGVO
-├── 14-disaster-recovery.md      # Wiederherstellung in < 60 min
-├── 15-onboarding.md             # Runbook für neue Admins
-└── assets/
-    ├── architecture-data.mmd    # Daten-Pipeline (deine ASCII-Vorlage als Mermaid)
-    ├── architecture-infra.mmd   # VM-/Container-/Netz-Sicht
-    ├── auth-flow.mmd            # OIDC-Sequenz (Browser ↔ nginx ↔ Authentik)
-    └── *.png                    # gerenderte Versionen für Offline-Lesen
-```
+## Was passiert
 
----
+1. **`src/components/dashboard/TopAttackersTabbed.tsx`**
+   - Neue Helper `formatCountryCell(ip, iso2)` rendert die Zelle:
+     - private/loopback → `<span className="text-muted-foreground">LAN</span>`
+     - `iso2` vorhanden → `flag(iso2) + " " + (iso2ToIso3(iso2) ?? iso2)`
+     - sonst → `??`
+   - Zeile 258 ersetzt durch Aufruf des Helpers.
+   - Filter/Sortierung weiter auf `row.country` (ISO2). Optional: `cellValue` für `country` so ändern, dass auch der ISO3-String matcht (Filter-UX).
 
-### Kapitel 01 – Gesamtarchitektur (Inhalt)
+2. **`src/data/mockSecurityData.ts`** (Mock)
+   - Für die im Screenshot sichtbaren externen IPs ohne Enrichment Einträge in `mockIPEnrichment` ergänzen:
+     `3.129.187.38` (US/AWS), `81.19.216.85` (RU), `89.21.67.184` (DE), `5.255.118.182` (RU), `80.187.82.22` (DE).
+   - Damit ist die Anzeige sofort sichtbar, ohne auf echtes Backend zu warten.
 
-**1.1 Datenfluss-Sicht (deine Vorlage, 1:1 übernommen)**
+3. **Tooltip mit Ländername** (auf Wunsch): `title={iso2ToName(iso2)}` bei der Zelle. Sage Bescheid, wenn dies enthalten sein soll – ansonsten weglassen.
 
-```text
-┌─────────────┐   ┌─────────────┐   ┌─────────────┐
-│  Mailcow    │   │  OPNsense   │   │  Fail2ban   │
-│ Postfix/    │   │  + CrowdSec │   │  Jails      │
-│ Dovecot/    │   │             │   │             │
-│ nginx       │   │             │   │             │
-└──────┬──────┘   └──────┬──────┘   └──────┬──────┘
-       │ syslog/         │ API/log         │ logs
-       ▼                 ▼                 ▼
-      ┌───────────────────────────────────────┐
-      │   LogCollector (Python)               │
-      │   - Parser (pro Quelle)               │
-      │   - Normalizer                        │
-      │   - Enricher (GeoIP/ASN)              │
-      │   - Risk-Scorer                       │
-      └──────────────┬────────────────────────┘
-                     ▼
-            ┌─────────────────┐
-            │  MariaDB logdb  │
-            │  - security_events
-            │  - auth_events
-            │  - ip_summary
-            │  - ip_enrichment
-            │  - ip_risk_score│
-            └────────┬────────┘
-                     ▼
-            ┌─────────────────┐
-            │  Dashboard API  │
-            │  (Express)      │
-            └────────┬────────┘
-                     ▼
-            ┌─────────────────┐
-            │  React UI       │
-            │  (Dashboard)    │
-            └─────────────────┘
-```
+4. **Keine** Änderung am API-Vertrag, am DB-Schema oder am Backend.
 
-> Der LogCollector schreibt normalisierte Events nach MariaDB. Periodische Jobs (IP-Enricher, Risk-Score, IP-Summary) lassen sich unter **Tools** im Dashboard manuell anstoßen. Das Dashboard liest **ausschließlich** über die Express-API — keine Direktverbindung zur Datenbank.
+## Technische Details
 
-**1.2 Infrastruktur-Sicht (Mermaid → PNG)** — ergänzt die Datenflusssicht um die physische Ebene:
-- VMs: `OPNsense` (Firewall + ACME) | `Authentik-VM` (`sso.servuswir.de:9443`) | `LogServer-VM` (MariaDB `logdb` + LogCollector-Python) | `LogSrv` (Docker-Host für Dashboard) | `Mailcow-VM`
-- Container auf LogSrv: `proxy` (nginx 80/443, TLS-Termination) → `dashboard` (nginx + React-SPA) + `api` (Express, Port 3001) + `db` (PostgreSQL für Dashboard-Eigendaten) + `backup`
-- Docker-Netz `logserver_default`: brückt `api`-Container zu `logserver-db` (MariaDB)
-- Pfeile mit Protokoll/Port-Beschriftung
+- ISO3-Konvertierung: bestehender Helper `iso2ToIso3` aus `src/lib/geoAttacks.ts` (~36 Länder gemappt). Fallback bei Lücke = ISO2.
+- Flag-Emoji aus ISO2 (ISO3 funktioniert nicht für Regional Indicators):
+  ```ts
+  const flag = (iso2: string) =>
+    iso2.toUpperCase().replace(/./g, c =>
+      String.fromCodePoint(127397 + c.charCodeAt(0))
+    );
+  ```
+- Private-IP-Erkennung als kleine Funktion in der Komponente:
+  ```ts
+  const isPrivate = (ip: string) =>
+    /^10\./.test(ip) ||
+    /^192\.168\./.test(ip) ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(ip) ||
+    /^127\./.test(ip);
+  ```
+- Spalten-Layout: `inline-flex items-center gap-1 font-mono`.
 
-**1.3 Auth-Flow-Sequenz (Mermaid → PNG)**:
-Browser → `https://logdash.servuswir.de` → SPA → `/auth/authorize` (Redirect) → `sso.servuswir.de:9443/application/o/log-dashboard/` → Login → Callback `/auth/callback` mit Code → PKCE-Token-Exchange → API-Calls mit Bearer-Token
+## Verifikation nach Implementierung
 
-**1.4 Verantwortlichkeiten pro Komponente** (Tabelle: Komponente | Zweck | Schreibt nach | Liest von | Betreiber-VM)
+- Build/Typecheck läuft (Lovable übernimmt).
+- Visuell prüfen: 24h/7d/30d-Tabs zeigen für die o. g. IPs jetzt z. B. `🇺🇸 USA`, `🇷🇺 RUS`, `🇩🇪 DEU`; die `192.168.x` Zeilen zeigen `LAN`.
 
-**1.5 Trennung der Belange**
-- **LogCollector** (separate VM/Repo): Ingestion + Normalisierung + Enrichment
-- **Dashboard** (dieses Repo): nur Visualisierung + manuelles Triggern von Jobs
-- **Authentik** (separate VM): SSO/OIDC, kein direkter App-Zugriff auf User-DB
-- **OPNsense**: Netzwerk-Edge + CrowdSec-Quelle, eigener API-Zugang für Read-Only
+## Out of scope
 
-**1.6 Daten-Quellen-Tabelle**: Quelle | Transport | Format | Frequenz | Ziel-Tabelle
-- Mailcow → syslog → raw → kontinuierlich → `auth_events` / `security_events`
-- OPNsense + CrowdSec → API + log → JSON → 60s Polling → `security_events`
-- Fail2ban → SSH `tail` → text → 30s → `auth_events`
-
----
-
-### Kapitel 09 – LogCollector-Pipeline (neu, ergänzend)
-
-Damit die Architektur vollständig ist, beschreibt dieses Kapitel die Pipeline (auch wenn der Code in einem separaten Repo liegt):
-- **Parser**: ein Modul pro Quelle (mailcow/opnsense/fail2ban/crowdsec)
-- **Normalizer**: einheitliches Event-Schema (timestamp, source, type, src_ip, dst_ip, user, action, severity)
-- **Enricher**: GeoIP (MaxMind), ASN, Reverse-DNS — Cache in `ip_enrichment`
-- **Risk-Scorer**: Heuristik (Anzahl Fails, GeoIP-Country, ASN-Reputation, CrowdSec-Match) → `ip_risk_score`
-- **Trigger via Dashboard-Tools**: API-Endpoints `/api/tools/run-enricher`, `/api/tools/recompute-risk`, `/api/tools/rebuild-summary`
-
-### Kapitel 10 – Datenbank-Schema
-
-Dokumentiert die MariaDB-Tabellen mit Spalten/Indizes/Beispiel-Rows:
-- `security_events`, `auth_events`, `ip_summary`, `ip_enrichment`, `ip_risk_score`
-- ER-Diagramm (Mermaid)
-- Retention-Strategie (Partitionierung nach Monat empfohlen)
-
----
-
-### Restliche Kapitel (Kurzfassung — Details wie zuvor besprochen)
-
-- **02 Voraussetzungen**: VM-Specs, Debian 12/13, Docker ≥24, DNS-Records, Public-IP, Accounts
-- **03 Installation**: 14 nummerierte Schritte, copy-paste-fähig
-- **04 Configuration-Reference**: jede `.env`-Variable in Tabellenform + komplettes Beispiel; Hinweis welche Vite-Vars Rebuild erfordern
-- **05 Zertifikate**: OPNsense `os-acme-client` Schritt-für-Schritt (Account, HTTP-01/DNS-01, Auto-Renew, Export per scp nach `/opt/dashboard/deploy/certs/`, nginx-Reload-Hook); Variante manuell `certbot`; Variante eigene CA
-- **06 Authentik**: Provider OIDC (PKCE), Application `log-dashboard`, Scopes, Federation (Google/MS/SAML), MFA, Discovery-URL-Verifikation
-- **07 OPNsense**: NAT (80/443→LogSrv, 9443→Authentik), Aliases, Floating-Rules, API-User für Dashboard mit minimalen Privileges, CrowdSec-LAPI + Bouncer-Key, Remote-Syslog
-- **08 SSH-Log-Abholung**: Public-Key auslesen, `logreader`-User auf Remotes, restricted `authorized_keys`, sudoers, `REMOTE_HOSTS`-Format, Key-Rotation
-- **11 Betrieb**: Update-Befehle, Backup (PG-Dump + logs + .env-encrypted + certs), Restore, Healthchecks, Monitoring-Empfehlung (Uptime-Kuma)
-- **12 Troubleshooting**: 404 `/api/*`, 502, OIDC-Loop, MariaDB-Netz, TLS-Cert, leere SSH-Logs — jeweils Diagnose + Fix
-- **13 Security**: `.env` chmod 600, TLS+HSTS, Authentik-MFA, CrowdSec, verschlüsselte Offsite-Backups, DSGVO-Auflistung, Audit-Trail
-- **14 Disaster-Recovery**: RTO < 60 min Runbook
-- **15 Onboarding**: Tag-1/Woche-1 Checkliste für neue Admins
-
-### Sprache & Format
-- Deutsch, Markdown, Mermaid-Diagramme + PNG-Export für Offline
-- Tabellen für Variablen/Ports/Rechte
-- Copy-paste-fähige Code-Blöcke
-- Querverweise zwischen Kapiteln
-
----
-
-**Fertig zum Implementieren.** Klicke „Implement plan" und ich lege alle 16 Dateien + Diagramme an. Wenn du noch etwas ergänzen willst (z. B. eigenes Kapitel zur LogCollector-VM-Installation, Mailcow-Syslog-Setup, oder ein API-Endpoint-Verzeichnis), sag kurz Bescheid.
+- Erweiterung des `COUNTRY_TABLE` in `geoAttacks.ts` um alle 249 Länder (kann später, nur bei Bedarf).
+- Backend-Job, der fehlende `ip_enrichment.country`-Werte über GeoIP nachfüllt (LogCollector-Seite, separates Repo).
