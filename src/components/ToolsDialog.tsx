@@ -191,6 +191,58 @@ export const ToolsDialog = ({
               Prüfen
             </Button>
           </div>
+
+          <div className="flex items-start justify-between gap-3 rounded-md border border-border/60 bg-muted/20 p-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium">Country-Codes nachtragen (intern)</p>
+              <p className="text-[11px] text-muted-foreground">
+                Fallback ohne Python-Collector: lädt fehlende <code>country</code> /{" "}
+                <code>asn</code> / <code>org_name</code> via ip-api.com (ISO-2) und
+                schreibt sie in <code>ip_enrichment</code>. Private IPs werden
+                übersprungen.
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!!running}
+              onClick={async () => {
+                setRunning("backfill_country");
+                setResult(null);
+                setError(null);
+                try {
+                  const res = await fetch(`${API_BASE}/tools/backfill-country`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ mode: "all", limit: 200 }),
+                  });
+                  if (!res.ok) {
+                    const text = await res.text();
+                    throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
+                  }
+                  const data = await res.json();
+                  setResult({
+                    id: "backfill_country",
+                    exit_code: data.ok ? 0 : 1,
+                    ok: !!data.ok,
+                    stdout: JSON.stringify(data, null, 2),
+                    stderr: "",
+                  });
+                } catch (e) {
+                  setError(e instanceof Error ? e.message : String(e));
+                } finally {
+                  setRunning(null);
+                }
+              }}
+            >
+              {running === "backfill_country" ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Play className="h-3.5 w-3.5" />
+              )}
+              Nachtragen
+            </Button>
+          </div>
         </div>
 
         <Separator />
