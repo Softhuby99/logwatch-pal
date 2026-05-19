@@ -266,6 +266,12 @@ const BanTimeline = ({ intervals, compact = false, events = [] }: Props) => {
                         </span>
                       </div>
                       <div className="flex justify-between gap-3">
+                        <span className="text-muted-foreground">Status:</span>
+                        <span className={iv.active ? "text-red-400" : iv.end_reason === "unban" ? "text-emerald-400" : "text-amber-400"}>
+                          {endReasonLabel(iv.end_reason)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between gap-3">
                         <span className="text-muted-foreground">Quelle:</span>
                         <span className="text-foreground">
                           {iv.source_system}
