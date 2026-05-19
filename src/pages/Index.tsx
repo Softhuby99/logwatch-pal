@@ -29,7 +29,7 @@ const Index = () => (
               Collector v2.9.3 • Mailcow + CrowdSec
             </p>
             <p className="text-[10px] text-muted-foreground/70 leading-tight">
-              Dashboard v0.7
+              Dashboard v0.8
             </p>
           </div>
         </div>
