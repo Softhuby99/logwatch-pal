@@ -49,6 +49,16 @@ const fmtDuration = (ms: number) => {
   return h ? `${d}d ${h}h` : `${d}d`;
 };
 
+const endReasonLabel = (r: BanInterval["end_reason"]): string => {
+  switch (r) {
+    case "unban": return "beendet (Unban-Event)";
+    case "next_ban": return "beendet (neuer Ban folgte)";
+    case "expired": return "beendet (abgelaufen)";
+    case "status_clean": return "beendet (Status: clean)";
+    default: return "aktiv";
+  }
+};
+
 const BanTimeline = ({ intervals, compact = false, events = [] }: Props) => {
   const [hoverId, setHoverId] = useState<string | null>(null);
   const [hoverEvId, setHoverEvId] = useState<string | null>(null);
