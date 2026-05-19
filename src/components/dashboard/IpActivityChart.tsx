@@ -339,7 +339,7 @@ const IpActivityChart = ({ events, dailyFallback = [] }: Props) => {
                   ["g-act-auth", "hsl(38 92% 50%)"],
                   ["g-act-success", "hsl(142 71% 55%)"],
                   ["g-act-port", "hsl(217 91% 60%)"],
-                  ["g-act-ban", "hsl(290 70% 55%)"],
+                  ["g-act-ban", "hsl(292 84% 61%)"],
                   ["g-act-unban", "hsl(142 71% 45%)"],
                   ["g-act-crawl", "hsl(180 60% 45%)"],
                 ].map(([id, color]) => (
