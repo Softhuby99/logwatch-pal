@@ -10,14 +10,15 @@ import { geoCentroid } from "d3-geo";
 import { scaleLinear, scaleSqrt } from "d3-scale";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Globe, MousePointerClick, ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
+import { Globe, MousePointerClick, ZoomIn, ZoomOut, RotateCcw, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-  getCountryAttackStats,
+  fetchCountryAttackStats,
   isoNToIso2,
   type CountryAttackStat,
   type RegionAttackStat,
 } from "@/lib/geoAttacks";
+import { useApiData } from "@/hooks/useApiData";
 import CountryDetailSheet from "./CountryDetailSheet";
 
 // World atlas TopoJSON (countries-110m, IDs sind ISO-Numeric als string z.B. "643")
