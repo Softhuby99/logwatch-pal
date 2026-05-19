@@ -49,6 +49,16 @@ const fmtDuration = (ms: number) => {
   return h ? `${d}d ${h}h` : `${d}d`;
 };
 
+const endReasonLabel = (r: BanInterval["end_reason"]): string => {
+  switch (r) {
+    case "unban": return "beendet (Unban-Event)";
+    case "next_ban": return "beendet (neuer Ban folgte)";
+    case "expired": return "beendet (abgelaufen)";
+    case "status_clean": return "beendet (Status: clean)";
+    default: return "aktiv";
+  }
+};
+
 const BanTimeline = ({ intervals, compact = false, events = [] }: Props) => {
   const [hoverId, setHoverId] = useState<string | null>(null);
   const [hoverEvId, setHoverEvId] = useState<string | null>(null);
@@ -213,12 +223,16 @@ const BanTimeline = ({ intervals, compact = false, events = [] }: Props) => {
                   style={{ transform: "translateX(-50%)" }}
                   title={`Ban: ${fmtFull(iv.banned_at)}`}
                 />
-                {/* End-Marker (Unban) wenn nicht aktiv – grüner Punkt */}
+                {/* End-Marker wenn nicht aktiv – grün bei echtem Unban, gelb bei abgeleitet */}
                 {!iv.active && (
                   <div
-                    className="absolute -top-[5px] right-0 w-3 h-3 rounded-full bg-emerald-500 border-2 border-background ring-1 ring-emerald-300 shadow-[0_0_6px_hsl(142_71%_45%/0.7)]"
+                    className={`absolute -top-[5px] right-0 w-3 h-3 rounded-full border-2 border-background ring-1 ${
+                      iv.end_reason === "unban"
+                        ? "bg-emerald-500 ring-emerald-300 shadow-[0_0_6px_hsl(142_71%_45%/0.7)]"
+                        : "bg-amber-400 ring-amber-200 shadow-[0_0_6px_hsl(45_93%_55%/0.7)]"
+                    }`}
                     style={{ transform: "translateX(50%)" }}
-                    title={`Unban: ${iv.unbanned_at}`}
+                    title={`Ende: ${iv.unbanned_at} (${iv.end_reason ?? ""})`}
                   />
                 )}
 
@@ -249,6 +263,12 @@ const BanTimeline = ({ intervals, compact = false, events = [] }: Props) => {
                         <span className="text-muted-foreground">Unban:</span>
                         <span className={iv.active ? "text-amber-400" : "text-emerald-400"}>
                           {iv.unbanned_at ? fmtFull(iv.unbanned_at) : "— noch aktiv —"}
+                        </span>
+                      </div>
+                      <div className="flex justify-between gap-3">
+                        <span className="text-muted-foreground">Status:</span>
+                        <span className={iv.active ? "text-red-400" : iv.end_reason === "unban" ? "text-emerald-400" : "text-amber-400"}>
+                          {endReasonLabel(iv.end_reason)}
                         </span>
                       </div>
                       <div className="flex justify-between gap-3">
@@ -360,12 +380,22 @@ const BanTimeline = ({ intervals, compact = false, events = [] }: Props) => {
                       >
                         <Ban className="h-2.5 w-2.5 mr-0.5" /> aktiv
                       </Badge>
-                    ) : (
+                    ) : iv.end_reason === "unban" ? (
                       <Badge
                         variant="outline"
                         className="text-[10px] px-1.5 font-mono bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+                        title={endReasonLabel(iv.end_reason)}
                       >
                         <ShieldOff className="h-2.5 w-2.5 mr-0.5" /> beendet
+                      </Badge>
+                    ) : (
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] px-1.5 font-mono bg-amber-500/15 text-amber-400 border-amber-500/30"
+                        title={endReasonLabel(iv.end_reason)}
+                      >
+                        <ShieldOff className="h-2.5 w-2.5 mr-0.5" />
+                        {iv.end_reason === "expired" ? "abgelaufen" : iv.end_reason === "next_ban" ? "abgelöst" : "beendet"}
                       </Badge>
                     )}
                   </td>

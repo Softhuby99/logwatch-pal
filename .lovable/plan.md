@@ -1,55 +1,64 @@
-# GeoIP-Karte zeigt Mock-Daten statt Live-Werten
+## Problem
 
-## Root Cause
+In der Demo werden Bans korrekt als "aktiv" und "beendet" dargestellt, weil die Mock-Daten zu jedem `ban`-Event ein passendes `unban`-Event enthalten. `computeBanIntervals` in `src/lib/ipTimeline.ts` paart diese Paare und setzt `active=false` + `unbanned_at`.
 
-`src/components/dashboard/GeoAttackMap.tsx` und `CountryDetailSheet.tsx` rufen `getCountryAttackStats()` bzw. `getCountryDetail()` aus `src/lib/geoAttacks.ts` auf. Diese Funktionen aggregieren **ausschließlich `mockSecurityEvents` / `mockAuthEvents` / `mockIPEnrichment`** — also statische Demo-Daten, die zur Build-Zeit eingefroren wurden. Sie machen **keinen Fetch** auf die API.
+In der Live-Umgebung sehen wir nie ein "beendet", weil die Pipeline (Loki/Promtail → MySQL) zwar `ban_status='banning'` schreibt, aber **keine korrespondierenden `unbanning`-Events** in `security_events` ankommen. Belege:
 
-Es gibt zwar einen API-Endpoint `GET /api/geo-attacks` und `fetchGeoAttacks()` in `src/lib/api.ts` — der wird aber **nirgendwo aufgerufen**. Deshalb aktualisieren sich Länder/IPs/Standorte nie, egal wie viele neue Events in MariaDB landen oder wie oft du den Enricher startest.
+- In `deploy/api/server.js` wird ausschließlich `ban_status = 'banning'` gezählt — kein einziges `unbanning` wird gelesen oder zurückgegeben.
+- Die Tabelle `ip_summary` hat dagegen ein Feld `current_status` ('banned' / 'clean' …), das den aktuellen Zustand abbildet.
+- Folge: Alle Live-Intervalle laufen im Frontend in den `openBans`-Zweig und werden als `active=true` gerendert → durchgehend rot.
 
-Zusätzlich liefert der bestehende `/api/geo-attacks` nur `{country, count, bans, last_seen}` — ohne Regionen und ohne IP-Drilldown. Für die Karte mit Region-Bubbles und den Country-Detail-Sheet (IP-Tabelle) reicht das nicht.
+## Lösung
 
-## Plan
+Drei Bausteine, vom Frontend her ohne Backend-Ingestion-Änderung umsetzbar:
 
-### 1. API erweitern (`deploy/api/server.js`)
+### 1. Diagnose-Endpoint (klein, optional, hilft Verifikation)
+Im API-Server kurzes Logging / einen Counter, wie viele `unbanning`-Events pro IP in `security_events` existieren. Wenn das wirklich 0 ist, ist der nächste Schritt nötig.
 
-**a) `/api/geo-attacks` erweitern** — zusätzlich `unique_ips`, `auth_failures`, `crit_events`, `warn_events`, `max_risk_score`, `attack_weight` aus `security_events` + `auth_events` + `ip_risk_score` zurückgeben. Regionen lassen wir vorerst weg (kein Region-Feld in `ip_enrichment` laut Schema), Bubbles werden dann pro Land als **eine** Bubble dargestellt.
+### 2. Heuristisches Ableiten des Ban-Endes im Frontend
+`computeBanIntervals` in `src/lib/ipTimeline.ts` so erweitern, dass ein offener Ban automatisch als **beendet** markiert wird, sobald eine der folgenden Bedingungen zutrifft:
 
-**b) Neuer Endpoint `GET /api/geo/country/:iso2`** — liefert IP-Liste für ein Land:
+a. **Folge-Ban**: Tritt nach einem offenen Ban derselben IP ein *neuer* `ban`-Event auf, wird der vorige Ban auf `unbanned_at = neuer ban.event_time` gesetzt (`active=false`, Grund: "implizit beendet — neuer Ban folgte"). Das deckt die häufigste Realität ab (CrowdSec/Fail2Ban verlängert/erneuert Bans regelmäßig).
+
+b. **Konfigurierbare Default-Bandauer** (z. B. 4 h für CrowdSec, 10 min für Fail2Ban) als Fallback: Wenn der letzte Ban älter ist als diese Dauer **und** `ip_summary.current_status !== 'banned'`, wird er ebenfalls als beendet markiert (`unbanned_at = banned_at + duration`, Grund: "abgelaufen").
+
+c. **`current_status`-Override**: Nur der allerletzte offene Ban darf `active=true` bleiben, und auch nur, wenn `summary.current_status === 'banned'`. Sonst → beendet auf `summary.last_seen` (oder jetzt).
+
+### 3. UI-Hinweis in `BanTimeline.tsx`
+Tooltip/Label um den Grund erweitern: "aktiv", "beendet (Unban-Event)", "beendet (neuer Ban folgte)", "beendet (abgelaufen)". Damit ist optisch und semantisch sofort klar, *warum* der Ban als beendet gilt — auch wenn kein explizites Unban-Event existiert.
+
+## Geänderte Dateien
+
+- `src/lib/ipTimeline.ts` — `computeBanIntervals` erweitert, `BanInterval` bekommt Feld `end_reason: "unban" | "next_ban" | "expired" | "status_clean" | null`.
+- `src/components/dashboard/BanTimeline.tsx` — Tooltip + visuelle Differenzierung der Endgründe (grüner Marker für echten Unban, gelber/grauer Marker für abgeleitet beendete Bans).
+- `src/components/dashboard/IpDetailView.tsx` — `summary.current_status` und `summary.last_seen` an `buildIpTimelineBundle` durchreichen (Parameter-Erweiterung).
+- `deploy/api/server.js` (optional, Diagnose) — Im `/api/ip/:ip/events`-Response auch die Anzahl `unbanning`-Events mitliefern und kurz loggen.
+- `src/pages/Index.tsx` — Version auf **v0.8** anheben.
+
+## Technische Details
+
+`BanInterval` neu:
+```ts
+end_reason: "unban" | "next_ban" | "expired" | "status_clean" | null;
 ```
-{ iso2, ips: [{ ip, events, bans, auth_failures, last_alert,
-                 org_name, asn, ptr, risk_score, risk_level }],
-  totals: {...} }
+
+`buildIpTimelineBundle(ip, sec, auth, summary, enrichment, risk)` reicht `summary` an `computeBanIntervals(events, summary)` weiter. Die Heuristik wird *nur* angewendet, wenn die normale Unban-Paarung (a) kein Ergebnis bringt, damit echte Unban-Events Vorrang behalten.
+
+Default-Bandauer-Konstanten:
+```ts
+const DEFAULT_BAN_DURATION_MS: Record<string, number> = {
+  crowdsec: 4 * 60 * 60 * 1000,     // 4h
+  netfilter: 10 * 60 * 1000,        // 10min (mailcow/fail2ban)
+  default: 60 * 60 * 1000,          // 1h
+};
 ```
-Query joint `ip_enrichment` (gefiltert nach `country = ?` und `ip_scope = 'external'`) mit Event-Counts aus `security_events`/`auth_events` und `ip_risk_score`.
 
-### 2. Frontend auf API umstellen
+## Deployment
 
-**`src/lib/geoAttacks.ts`**
-- Mock-Imports und `eventCountByIp()`/`REGIONS_BY_COUNTRY` entfernen.
-- `getCountryAttackStats()` und `getCountryDetail()` → in **async-Fetcher** umwandeln, die `apiFetch` über die neuen Endpoints nutzen (mit leerem Fallback). ISO2→ISO3/Name-Mapping (`COUNTRY_TABLE`) bleibt clientseitig.
+```bash
+cd /opt/dashboard && sudo git pull && cd deploy && \
+sudo docker compose build api dashboard && \
+sudo docker compose up -d api dashboard
+```
 
-**`src/components/dashboard/GeoAttackMap.tsx`**
-- `useMemo(getCountryAttackStats())` → `useApiData(fetchCountryStats, [])` (nutzt globalen Refresh-Intervall).
-- Bei leerem `stats` Loading-/Empty-State zeigen.
-- Region-Bubbles auf eine Bubble pro Land reduzieren (`unique_ips` als Größe), da keine echten Region-Daten existieren. Tooltip/Card-UI bleibt sonst gleich.
-
-**`src/components/dashboard/CountryDetailSheet.tsx`**
-- `useMemo(getCountryDetail(iso2))` → `useApiData(() => fetchCountryDetail(iso2), [iso2])`. Loading-Spinner anzeigen.
-
-### 3. Dashboard-Version
-
-`src/pages/Index.tsx`: Header-Version `v0.5` → `v0.6` (laut Core-Memory-Regel bei jedem Frontend-Update).
-
-## Was nicht geändert wird
-
-- MaxMind/ip-api-Enrichment selbst (läuft bereits, du hast die Backfill-Tools).
-- Mock-Daten bleiben als Datei (werden von anderen Komponenten noch genutzt) — nur die Imports in `geoAttacks.ts` entfallen.
-- Layout/Design der Karte unverändert; nur die Datenquelle wechselt.
-
-## Verifikation nach Implementierung
-
-1. `docker compose build dashboard api && docker compose up -d dashboard api`
-2. Strg+Shift+R im Browser → Header zeigt `v0.6`.
-3. Karte sollte denselben Stand wie `curl http://<host>/api/geo-attacks` zeigen.
-4. Nach Klick auf ein Land lädt das Sheet die IP-Liste live aus `/api/geo/country/<iso2>`.
-5. Neuer Enricher-Lauf + Refresh → IPs/Länder erscheinen ohne Rebuild.
+Danach im Browser **Strg+Shift+R**.

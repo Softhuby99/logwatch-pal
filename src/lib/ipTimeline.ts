@@ -160,6 +160,8 @@ export interface IpTimelineBundle {
   ban_intervals: BanInterval[];
 }
 
+export type BanEndReason = "unban" | "next_ban" | "expired" | "status_clean" | null;
+
 export interface BanInterval {
   /** Eindeutige Id (= ban-event-id) */
   id: string;
@@ -169,50 +171,82 @@ export interface BanInterval {
   unbanned_at: string | null;
   /** Dauer in ms (bei aktiven Bans bis "jetzt") */
   duration_ms: number;
-  /** true = noch aktiv (kein passendes Unban-Event gefunden) */
+  /** true = noch aktiv */
   active: boolean;
-  /** Quelle (mailcow/netfilter, opnsense/crowdsec etc.) */
   source_system: string;
   source_component: string | null;
-  /** Grund für den Ban (aus dem ban-Event) */
   reason: string;
-  /** Optional: scenario_name (CrowdSec) */
   scenario_name: string | null;
+  /** Wie wurde das Ende des Bans bestimmt? null = aktiv */
+  end_reason: BanEndReason;
 }
 
+/** Default-Bandauern pro Quelle (für heuristische Ableitung des Endes) */
+const DEFAULT_BAN_DURATION_MS: Record<string, number> = {
+  crowdsec: 4 * 60 * 60 * 1000,
+  opnsense: 4 * 60 * 60 * 1000,
+  netfilter: 10 * 60 * 1000,
+  mailcow: 10 * 60 * 1000,
+  default: 60 * 60 * 1000,
+};
+
+const guessBanDurationMs = (source_system: string, source_component: string | null): number => {
+  const sys = (source_system || "").toLowerCase();
+  const comp = (source_component || "").toLowerCase();
+  return (
+    DEFAULT_BAN_DURATION_MS[comp] ??
+    DEFAULT_BAN_DURATION_MS[sys] ??
+    DEFAULT_BAN_DURATION_MS.default
+  );
+};
+
 /**
- * Paart Ban-Events mit dem nächsten Unban-Event derselben IP.
- * Erwartet: events sortiert egal, intern wird aufsteigend sortiert.
+ * Paart Ban- mit Unban-Events. Wenn keine Unban-Events existieren (häufig in
+ * Live-Daten), werden Enden heuristisch abgeleitet:
+ *  - Folge-Ban schließt vorherige offene Bans
+ *  - Default-Bandauer pro Quelle → "abgelaufen"
+ *  - current_status der IP: nur wenn 'banned' darf der letzte Ban aktiv bleiben
  */
-const computeBanIntervals = (events: IpTimelineEvent[]): BanInterval[] => {
+const computeBanIntervals = (
+  events: IpTimelineEvent[],
+  summary: IpSummary | null = null
+): BanInterval[] => {
   const asc = [...events].sort(
     (a, b) => new Date(a.event_time).getTime() - new Date(b.event_time).getTime()
   );
   const intervals: BanInterval[] = [];
-  // FIFO-Queue offener Bans (in Reihenfolge)
   const openBans: IpTimelineEvent[] = [];
+
+  const pushClosed = (ban: IpTimelineEvent, endIso: string, end_reason: BanEndReason) => {
+    const start = new Date(ban.event_time).getTime();
+    const end = new Date(endIso).getTime();
+    intervals.push({
+      id: ban.id,
+      banned_at: ban.event_time,
+      unbanned_at: endIso,
+      duration_ms: Math.max(0, end - start),
+      active: false,
+      source_system: ban.source_system,
+      source_component: ban.source_component,
+      reason: ban.description || ban.type_label,
+      scenario_name: ban.scenario_name,
+      end_reason,
+    });
+  };
 
   asc.forEach((ev) => {
     if (ev.kind === "ban") {
+      // Folge-Ban schließt alle vorigen offenen Bans derselben IP
+      while (openBans.length > 0) {
+        const prev = openBans.shift()!;
+        pushClosed(prev, ev.event_time, "next_ban");
+      }
       openBans.push(ev);
     } else if (ev.kind === "unban") {
       const ban = openBans.shift();
       if (ban) {
-        const start = new Date(ban.event_time).getTime();
-        const end = new Date(ev.event_time).getTime();
-        intervals.push({
-          id: ban.id,
-          banned_at: ban.event_time,
-          unbanned_at: ev.event_time,
-          duration_ms: Math.max(0, end - start),
-          active: false,
-          source_system: ban.source_system,
-          source_component: ban.source_component,
-          reason: ban.description || ban.type_label,
-          scenario_name: ban.scenario_name,
-        });
+        pushClosed(ban, ev.event_time, "unban");
       } else {
-        // Unban ohne passenden Ban → als „nur Unban" Marker (sehr kurzes Intervall, wird in UI ignoriert)
         intervals.push({
           id: ev.id,
           banned_at: ev.event_time,
@@ -223,15 +257,32 @@ const computeBanIntervals = (events: IpTimelineEvent[]): BanInterval[] => {
           source_component: ev.source_component,
           reason: "Unban ohne erfasstes Ban-Event",
           scenario_name: ev.scenario_name,
+          end_reason: "unban",
         });
       }
     }
   });
 
-  // Übrig gebliebene = noch aktive Bans
   const nowMs = Date.now();
-  openBans.forEach((ban) => {
+  const statusIsBanned = summary?.current_status === "banned";
+
+  openBans.forEach((ban, idx) => {
     const start = new Date(ban.event_time).getTime();
+    const isLast = idx === openBans.length - 1;
+    const defaultDur = guessBanDurationMs(ban.source_system, ban.source_component);
+    const expiryMs = start + defaultDur;
+
+    if (nowMs > expiryMs && (!isLast || !statusIsBanned)) {
+      pushClosed(ban, new Date(expiryMs).toISOString(), "expired");
+      return;
+    }
+
+    if (isLast && summary && !statusIsBanned) {
+      const endIso = summary.last_seen || new Date(nowMs).toISOString();
+      pushClosed(ban, endIso, "status_clean");
+      return;
+    }
+
     intervals.push({
       id: ban.id,
       banned_at: ban.event_time,
@@ -242,6 +293,7 @@ const computeBanIntervals = (events: IpTimelineEvent[]): BanInterval[] => {
       source_component: ban.source_component,
       reason: ban.description || ban.type_label,
       scenario_name: ban.scenario_name,
+      end_reason: null,
     });
   });
 
@@ -340,7 +392,7 @@ const assembleBundle = (
     stats,
     daily: computeDaily(events),
     by_type,
-    ban_intervals: computeBanIntervals(events),
+    ban_intervals: computeBanIntervals(events, summary),
   };
 };
 
