@@ -213,12 +213,16 @@ const BanTimeline = ({ intervals, compact = false, events = [] }: Props) => {
                   style={{ transform: "translateX(-50%)" }}
                   title={`Ban: ${fmtFull(iv.banned_at)}`}
                 />
-                {/* End-Marker (Unban) wenn nicht aktiv – grüner Punkt */}
+                {/* End-Marker wenn nicht aktiv – grün bei echtem Unban, gelb bei abgeleitet */}
                 {!iv.active && (
                   <div
-                    className="absolute -top-[5px] right-0 w-3 h-3 rounded-full bg-emerald-500 border-2 border-background ring-1 ring-emerald-300 shadow-[0_0_6px_hsl(142_71%_45%/0.7)]"
+                    className={`absolute -top-[5px] right-0 w-3 h-3 rounded-full border-2 border-background ring-1 ${
+                      iv.end_reason === "unban"
+                        ? "bg-emerald-500 ring-emerald-300 shadow-[0_0_6px_hsl(142_71%_45%/0.7)]"
+                        : "bg-amber-400 ring-amber-200 shadow-[0_0_6px_hsl(45_93%_55%/0.7)]"
+                    }`}
                     style={{ transform: "translateX(50%)" }}
-                    title={`Unban: ${iv.unbanned_at}`}
+                    title={`Ende: ${iv.unbanned_at} (${iv.end_reason ?? ""})`}
                   />
                 )}
 
