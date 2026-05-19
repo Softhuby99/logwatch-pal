@@ -1,43 +1,55 @@
-# Plan: Fehlende Länder-/Org-Daten im Backend beheben
+# GeoIP-Karte zeigt Mock-Daten statt Live-Werten
 
-## Ziel
-Die `??`-Anzeige bei **Top Angreifer** soll nicht mehr durch fehlende Backend-Daten verursacht werden. Aktuell deutet alles darauf hin, dass für betroffene IPs **keine Datensätze in `ip_enrichment` existieren**.
+## Root Cause
 
-## Was ich umsetzen würde
+`src/components/dashboard/GeoAttackMap.tsx` und `CountryDetailSheet.tsx` rufen `getCountryAttackStats()` bzw. `getCountryDetail()` aus `src/lib/geoAttacks.ts` auf. Diese Funktionen aggregieren **ausschließlich `mockSecurityEvents` / `mockAuthEvents` / `mockIPEnrichment`** — also statische Demo-Daten, die zur Build-Zeit eingefroren wurden. Sie machen **keinen Fetch** auf die API.
 
-1. **Backend-Diagnose für Enrichment-Lücken ergänzen**
-   - Im API-Backend einen kleinen Read-only-Check ergänzen, der für die aktuellen Top-IP-Adressen erkennt:
-     - welche IPs in `ip_summary` vorhanden sind,
-     - welche davon in `ip_enrichment` fehlen,
-     - ob der manuelle `ip_enricher`-Job ausführbar ist.
-   - Ziel: klar zwischen „UI ok, Daten fehlen“ und „Join/Schema defekt“ unterscheiden.
+Es gibt zwar einen API-Endpoint `GET /api/geo-attacks` und `fetchGeoAttacks()` in `src/lib/api.ts` — der wird aber **nirgendwo aufgerufen**. Deshalb aktualisieren sich Länder/IPs/Standorte nie, egal wie viele neue Events in MariaDB landen oder wie oft du den Enricher startest.
 
-2. **API gegen Schema-Abweichungen absichern**
-   - Die Doku zeigt Inkonsistenzen zwischen dokumentiertem Schema und laufendem Backend (z. B. `src_ip` in der Doku vs. `ip` im API-Code, außerdem unterschiedliche Feldnamen bei Enrichment-Spalten).
-   - Ich würde die API robuster machen, damit sie mit den realen Spalten der Live-DB arbeitet bzw. im Fehlerfall sauber diagnostiziert statt still `??` zu liefern.
-   - Fokus auf die Queries für:
-     - `/api/top-attackers`
-     - angrenzende Endpunkte mit `ip_enrichment`-Join
+Zusätzlich liefert der bestehende `/api/geo-attacks` nur `{country, count, bans, last_seen}` — ohne Regionen und ohne IP-Drilldown. Für die Karte mit Region-Bubbles und den Country-Detail-Sheet (IP-Tabelle) reicht das nicht.
 
-3. **Betriebsweg für das eigentliche Nachladen schärfen**
-   - Den vorhandenen Tool-Flow (`/api/tools/run` mit `ip_enricher`) gezielt für diesen Fall nutzbar machen:
-     - bessere Rückmeldung, wenn der Collector-Pfad / Python-Interpreter / Modulpfad nicht stimmt,
-     - klar erkennbar, ob der Job erfolgreich lief,
-     - Hinweis, dass nach Enrichment ggf. `daily_summary` und `risk_engine` erneut laufen sollten.
+## Plan
 
-4. **Validierung**
-   - Prüfen, dass die betroffenen IPs nach dem Lauf des Jobs in `ip_enrichment` auftauchen.
-   - Danach verifizieren, dass `/api/top-attackers` für diese IPs `country` und `org_name` liefert.
-   - Erwartetes Ergebnis im UI: statt `??` z. B. Flagge + ISO3-Code.
+### 1. API erweitern (`deploy/api/server.js`)
 
-## Erwartetes Ergebnis
-- Die Ursache ist im Backend transparent nachvollziehbar.
-- Fehlende Enrichment-Daten können gezielt nachgeladen werden.
-- Die API reagiert robuster auf Schema-Unterschiede zwischen Doku, Collector und Live-DB.
-- Die Anzeige in **Top Angreifer** wird wieder korrekt mit Länder-/Org-Daten versorgt.
+**a) `/api/geo-attacks` erweitern** — zusätzlich `unique_ips`, `auth_failures`, `crit_events`, `warn_events`, `max_risk_score`, `attack_weight` aus `security_events` + `auth_events` + `ip_risk_score` zurückgeben. Regionen lassen wir vorerst weg (kein Region-Feld in `ip_enrichment` laut Schema), Bubbles werden dann pro Land als **eine** Bubble dargestellt.
 
-## Technische Details
-- Relevanter API-Code sitzt in `deploy/api/server.js`.
-- Aktuelle Query für Top-Angreifer joint bereits `ip_summary` mit `ip_enrichment`, aber die DB liefert für die betroffenen IPs offenbar keine Enrichment-Zeilen.
-- Die vorhandene Tool-Infrastruktur (`ip_enricher`, `daily_summary`, `risk_engine`) ist bereits da und sollte der primäre Backend-Fixpfad sein.
-- Dokumentation und Code verwenden teils unterschiedliche Schema-Begriffe; das ist ein zusätzlicher Risikofaktor und sollte im Backend abgefangen werden.
+**b) Neuer Endpoint `GET /api/geo/country/:iso2`** — liefert IP-Liste für ein Land:
+```
+{ iso2, ips: [{ ip, events, bans, auth_failures, last_alert,
+                 org_name, asn, ptr, risk_score, risk_level }],
+  totals: {...} }
+```
+Query joint `ip_enrichment` (gefiltert nach `country = ?` und `ip_scope = 'external'`) mit Event-Counts aus `security_events`/`auth_events` und `ip_risk_score`.
+
+### 2. Frontend auf API umstellen
+
+**`src/lib/geoAttacks.ts`**
+- Mock-Imports und `eventCountByIp()`/`REGIONS_BY_COUNTRY` entfernen.
+- `getCountryAttackStats()` und `getCountryDetail()` → in **async-Fetcher** umwandeln, die `apiFetch` über die neuen Endpoints nutzen (mit leerem Fallback). ISO2→ISO3/Name-Mapping (`COUNTRY_TABLE`) bleibt clientseitig.
+
+**`src/components/dashboard/GeoAttackMap.tsx`**
+- `useMemo(getCountryAttackStats())` → `useApiData(fetchCountryStats, [])` (nutzt globalen Refresh-Intervall).
+- Bei leerem `stats` Loading-/Empty-State zeigen.
+- Region-Bubbles auf eine Bubble pro Land reduzieren (`unique_ips` als Größe), da keine echten Region-Daten existieren. Tooltip/Card-UI bleibt sonst gleich.
+
+**`src/components/dashboard/CountryDetailSheet.tsx`**
+- `useMemo(getCountryDetail(iso2))` → `useApiData(() => fetchCountryDetail(iso2), [iso2])`. Loading-Spinner anzeigen.
+
+### 3. Dashboard-Version
+
+`src/pages/Index.tsx`: Header-Version `v0.5` → `v0.6` (laut Core-Memory-Regel bei jedem Frontend-Update).
+
+## Was nicht geändert wird
+
+- MaxMind/ip-api-Enrichment selbst (läuft bereits, du hast die Backfill-Tools).
+- Mock-Daten bleiben als Datei (werden von anderen Komponenten noch genutzt) — nur die Imports in `geoAttacks.ts` entfallen.
+- Layout/Design der Karte unverändert; nur die Datenquelle wechselt.
+
+## Verifikation nach Implementierung
+
+1. `docker compose build dashboard api && docker compose up -d dashboard api`
+2. Strg+Shift+R im Browser → Header zeigt `v0.6`.
+3. Karte sollte denselben Stand wie `curl http://<host>/api/geo-attacks` zeigen.
+4. Nach Klick auf ein Land lädt das Sheet die IP-Liste live aus `/api/geo/country/<iso2>`.
+5. Neuer Enricher-Lauf + Refresh → IPs/Länder erscheinen ohne Rebuild.

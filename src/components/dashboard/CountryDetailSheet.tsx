@@ -1,10 +1,10 @@
-import { useMemo } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { ChevronRight, Globe, Building2, Network } from "lucide-react";
-import { getCountryDetail } from "@/lib/geoAttacks";
+import { ChevronRight, Globe, Building2, Network, Loader2 } from "lucide-react";
+import { fetchCountryDetail } from "@/lib/geoAttacks";
+import { useApiData } from "@/hooks/useApiData";
 import { useIpDetail } from "@/contexts/IpDetailContext";
 import type { AlertLevel } from "@/types/database";
 
@@ -38,7 +38,22 @@ const countryFlag = (iso2: string) => {
 
 const CountryDetailSheet = ({ iso2, open, onOpenChange }: Props) => {
   const { openIp } = useIpDetail();
-  const data = useMemo(() => (iso2 ? getCountryDetail(iso2) : null), [iso2]);
+  const { data, loading } = useApiData(
+    () =>
+      iso2
+        ? fetchCountryDetail(iso2)
+        : Promise.resolve({
+            data: {
+              iso2: "",
+              iso3: null,
+              name: "",
+              ips: [],
+              totals: { unique_ips: 0, total_events: 0, bans: 0, auth_failures: 0 },
+            },
+            live: false,
+          }),
+    [iso2, open],
+  );
 
   const handleIpClick = (ip: string) => {
     onOpenChange(false);
@@ -68,7 +83,12 @@ const CountryDetailSheet = ({ iso2, open, onOpenChange }: Props) => {
           )}
         </SheetHeader>
 
-        {!data || data.ips.length === 0 ? (
+        {loading && (!data || data.ips.length === 0) ? (
+          <div className="border border-border/30 rounded p-6 text-center text-xs text-muted-foreground font-mono flex items-center justify-center gap-2">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            Lade IPs …
+          </div>
+        ) : !data || data.ips.length === 0 ? (
           <div className="border border-border/30 rounded p-6 text-center text-xs text-muted-foreground font-mono">
             Keine Angriffe aus diesem Land erfasst.
           </div>

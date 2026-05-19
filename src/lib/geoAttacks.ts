@@ -1,25 +1,34 @@
 /**
- * Geo Attack Aggregator
+ * Geo Attack Aggregator (Live-API)
  *
- * Aggregiert Angriffe pro Country (basierend auf ip_enrichment + security_events + auth_events).
- * Liefert Daten für Choropleth-Weltkarte und Country-Drilldown.
+ * Fetcht aggregierte Angriffsstatistik pro Land aus der Dashboard-API
+ * (Quelle: MariaDB ip_summary + ip_enrichment + ip_risk_score).
  *
- * Spätere FastAPI:
- *   GET /api/geo/countries
- *   GET /api/geo/country/{iso2}
+ * Endpunkte:
+ *   GET /api/geo-attacks          → CountryAttackStat[]
+ *   GET /api/geo/country/:iso2    → CountryDetail
  */
 
-import {
-  mockSecurityEvents,
-  mockAuthEvents,
-  mockIPEnrichment,
-  mockIPRiskScore,
-} from "@/data/mockSecurityData";
 import type { AlertLevel } from "@/types/database";
 
+const API_BASE = import.meta.env.VITE_API_URL || "/api";
+
+async function apiFetch<T>(path: string, fallback: T): Promise<{ data: T; live: boolean }> {
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      signal: AbortSignal.timeout(8000),
+      cache: "no-store",
+      headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return { data: (await res.json()) as T, live: true };
+  } catch {
+    return { data: fallback, live: false };
+  }
+}
+
 // ============================================================
-// ISO2 → ISO3 + Country Name (nur für Länder, die in Mocks vorkommen
-// + gängige Top-Quellländer). TopoJSON-Karte nutzt ISO_A3.
+// ISO2 → ISO3 + Country Name (TopoJSON nutzt ISO-Numeric als geo.id)
 // ============================================================
 
 interface CountryInfo {
@@ -94,7 +103,7 @@ export const iso3ToIso2 = (iso3: string): string | null => {
 };
 
 // ============================================================
-// Country Aggregation
+// Types
 // ============================================================
 
 export interface RegionAttackStat {
@@ -115,153 +124,10 @@ export interface CountryAttackStat {
   crit_events: number;
   warn_events: number;
   max_risk_score: number;
-  /** Basis für Choropleth-Färbung (gewichtete Summe) */
   attack_weight: number;
-  /** Aufschlüsselung pro Region (für Bubble-Marker auf der Karte) */
+  /** Reserviert: aktuell keine echten Regions-Daten in ip_enrichment. */
   regions: RegionAttackStat[];
 }
-
-// ----- Mock-Region per IP (deterministisch) -----
-// Für die Demo gibt es keine echten Region-Daten in mockIPEnrichment.
-// Wir leiten pro Land aus einer kurzen Region-Liste deterministisch über
-// einen Hash der IP eine Region ab. Das produziert stabile, plausible Daten
-// (gleiche IP → gleiche Region) – die echte FastAPI ersetzt das später durch
-// die `region`-Spalte aus der ip_enrichment Tabelle.
-const REGIONS_BY_COUNTRY: Record<string, string[]> = {
-  RU: ["Moskau", "St. Petersburg", "Nowosibirsk", "Jekaterinburg"],
-  UA: ["Kyiv", "Charkiw", "Odessa", "Lwiw"],
-  BD: ["Dhaka", "Chittagong", "Khulna"],
-  NL: ["Nordholland", "Südholland", "Utrecht"],
-  GB: ["London", "Manchester", "Edinburgh"],
-  EE: ["Harju", "Tartu"],
-  US: ["California", "Virginia", "Texas", "New York", "Oregon"],
-  DE: ["Berlin", "Bayern", "Hessen", "Nordrhein-Westfalen"],
-  CN: ["Peking", "Shanghai", "Guangdong", "Zhejiang"],
-  IN: ["Maharashtra", "Karnataka", "Delhi", "Tamil Nadu"],
-  BR: ["São Paulo", "Rio de Janeiro", "Minas Gerais"],
-  FR: ["Île-de-France", "Provence", "Auvergne-Rhône-Alpes"],
-  IT: ["Lombardei", "Latium", "Kampanien"],
-  ES: ["Madrid", "Katalonien", "Andalusien"],
-  PL: ["Masowien", "Schlesien", "Pommern"],
-  TR: ["Istanbul", "Ankara", "Izmir"],
-  IR: ["Teheran", "Isfahan", "Maschhad"],
-  KP: ["Pjöngjang"],
-  KR: ["Seoul", "Busan"],
-  JP: ["Tokio", "Osaka"],
-  VN: ["Hanoi", "Ho-Chi-Minh-Stadt"],
-  ID: ["Jakarta", "Java"],
-  PK: ["Punjab", "Sindh"],
-  RO: ["București", "Cluj"],
-  BG: ["Sofia"],
-  CZ: ["Prag"],
-  CH: ["Zürich", "Genf"],
-  AT: ["Wien", "Steiermark"],
-  SE: ["Stockholm"],
-  CA: ["Ontario", "Quebec"],
-  HK: ["Hongkong"],
-  SG: ["Singapur"],
-  AE: ["Dubai", "Abu Dhabi"],
-  ZA: ["Gauteng", "Westkap"],
-  MX: ["CDMX", "Jalisco"],
-  AR: ["Buenos Aires"],
-};
-
-const hashString = (s: string) => {
-  let h = 5381;
-  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
-  return Math.abs(h);
-};
-
-export const regionForIp = (iso2: string, ip: string): string => {
-  const list = REGIONS_BY_COUNTRY[iso2.toUpperCase()] ?? ["Unbekannt"];
-  return list[hashString(ip) % list.length];
-};
-
-const eventCountByIp = (): Map<string, { events: number; bans: number; authFails: number; crit: number; warn: number }> => {
-  const map = new Map<
-    string,
-    { events: number; bans: number; authFails: number; crit: number; warn: number }
-  >();
-
-  const bump = (ip: string, alert: AlertLevel, isBan: boolean, isAuthFail: boolean) => {
-    const cur = map.get(ip) ?? { events: 0, bans: 0, authFails: 0, crit: 0, warn: 0 };
-    cur.events++;
-    if (isBan) cur.bans++;
-    if (isAuthFail) cur.authFails++;
-    if (alert === "CRIT") cur.crit++;
-    else if (alert === "WARN") cur.warn++;
-    map.set(ip, cur);
-  };
-
-  mockSecurityEvents.forEach((e) => {
-    bump(e.ip, e.alert_level, e.ban_status === "banning", false);
-  });
-  mockAuthEvents.forEach((e) => {
-    if (!e.ip) return;
-    bump(e.ip, e.alert_level, false, e.auth_status === "failed");
-  });
-
-  return map;
-};
-
-export const getCountryAttackStats = (): CountryAttackStat[] => {
-  const ipStats = eventCountByIp();
-  const map = new Map<string, CountryAttackStat>();
-
-  mockIPEnrichment.forEach((enr) => {
-    if (!enr.country) return;
-    if (enr.ip_scope !== "external") return; // interne IPs aus Karte ausschließen
-    const iso2 = enr.country.toUpperCase();
-    const stats = ipStats.get(enr.ip);
-    if (!stats || stats.events === 0) return;
-    const risk = mockIPRiskScore.find((r) => r.ip === enr.ip);
-    const cur: CountryAttackStat = map.get(iso2) ?? {
-      iso2,
-      iso3: iso2ToIso3(iso2),
-      name: iso2ToName(iso2),
-      unique_ips: 0,
-      total_events: 0,
-      bans: 0,
-      auth_failures: 0,
-      crit_events: 0,
-      warn_events: 0,
-      max_risk_score: 0,
-      attack_weight: 0,
-      regions: [],
-    };
-    cur.unique_ips++;
-    cur.total_events += stats.events;
-    cur.bans += stats.bans;
-    cur.auth_failures += stats.authFails;
-    cur.crit_events += stats.crit;
-    cur.warn_events += stats.warn;
-    cur.max_risk_score = Math.max(cur.max_risk_score, risk?.score ?? 0);
-    // gewichtet: bans×3 + crit×2 + events
-    cur.attack_weight += stats.bans * 3 + stats.crit * 2 + stats.events;
-
-    // Region-Aufschlüsselung
-    const region = regionForIp(iso2, enr.ip);
-    let r = cur.regions.find((x) => x.region === region);
-    if (!r) {
-      r = { region, unique_ips: 0, total_events: 0, bans: 0 };
-      cur.regions.push(r);
-    }
-    r.unique_ips++;
-    r.total_events += stats.events;
-    r.bans += stats.bans;
-
-    map.set(iso2, cur);
-  });
-
-  // Regionen pro Land nach IP-Anzahl sortieren
-  const result = Array.from(map.values());
-  result.forEach((c) => c.regions.sort((a, b) => b.unique_ips - a.unique_ips));
-  return result.sort((a, b) => b.attack_weight - a.attack_weight);
-};
-
-// ============================================================
-// Country Drilldown: IPs aus diesem Land
-// ============================================================
 
 export interface CountryIpRow {
   ip: string;
@@ -289,50 +155,81 @@ export interface CountryDetail {
   };
 }
 
-export const getCountryDetail = (iso2: string): CountryDetail => {
-  const upper = iso2.toUpperCase();
-  const ipStats = eventCountByIp();
+// ============================================================
+// API Fetchers (für useApiData)
+// ============================================================
 
-  const enrichments = mockIPEnrichment.filter(
-    (e) => e.country?.toUpperCase() === upper && e.ip_scope === "external"
-  );
+interface ApiCountryRow {
+  country: string;
+  unique_ips?: number;
+  total_events?: number;
+  bans?: number;
+  auth_failures?: number;
+  crit_events?: number;
+  warn_events?: number;
+  max_risk_score?: number;
+  attack_weight?: number;
+  count?: number;
+}
 
-  const ips: CountryIpRow[] = enrichments
-    .map((enr) => {
-      const s = ipStats.get(enr.ip);
-      if (!s || s.events === 0) return null;
-      const risk = mockIPRiskScore.find((r) => r.ip === enr.ip);
-      // letztes alert level grob über security_events ableiten
-      const lastSec = mockSecurityEvents
-        .filter((e) => e.ip === enr.ip)
-        .sort((a, b) => new Date(b.event_time).getTime() - new Date(a.event_time).getTime())[0];
-      const last_alert: AlertLevel = lastSec?.alert_level ?? (s.crit > 0 ? "CRIT" : s.warn > 0 ? "WARN" : "INFO");
+export const fetchCountryAttackStats = async (): Promise<{
+  data: CountryAttackStat[];
+  live: boolean;
+}> => {
+  const { data, live } = await apiFetch<ApiCountryRow[]>("/geo-attacks", []);
+  const list: CountryAttackStat[] = (data || [])
+    .filter((r) => !!r.country)
+    .map((r) => {
+      const iso2 = String(r.country).toUpperCase();
+      const events = Number(r.total_events ?? r.count ?? 0);
+      const bans = Number(r.bans ?? 0);
+      const crit = Number(r.crit_events ?? 0);
       return {
-        ip: enr.ip,
-        events: s.events,
-        bans: s.bans,
-        auth_failures: s.authFails,
-        last_alert,
-        org_name: enr.org_name,
-        asn: enr.asn,
-        ptr: enr.ptr,
-        risk_score: risk?.score ?? 0,
-        risk_level: risk?.risk_level ?? "LOW",
-      } as CountryIpRow;
+        iso2,
+        iso3: iso2ToIso3(iso2),
+        name: iso2ToName(iso2),
+        unique_ips: Number(r.unique_ips ?? 0),
+        total_events: events,
+        bans,
+        auth_failures: Number(r.auth_failures ?? 0),
+        crit_events: crit,
+        warn_events: Number(r.warn_events ?? 0),
+        max_risk_score: Number(r.max_risk_score ?? 0),
+        attack_weight: Number(r.attack_weight ?? bans * 3 + crit * 2 + events),
+        regions: [],
+      };
     })
-    .filter((x): x is CountryIpRow => x !== null)
-    .sort((a, b) => b.risk_score - a.risk_score || b.events - a.events);
+    .sort((a, b) => b.attack_weight - a.attack_weight);
+  return { data: list, live };
+};
 
-  return {
+interface ApiCountryDetail {
+  iso2: string;
+  ips: CountryIpRow[];
+  totals: CountryDetail["totals"];
+}
+
+export const fetchCountryDetail = async (
+  iso2: string,
+): Promise<{ data: CountryDetail; live: boolean }> => {
+  const upper = iso2.toUpperCase();
+  const fallback: ApiCountryDetail = {
     iso2: upper,
-    iso3: iso2ToIso3(upper),
-    name: iso2ToName(upper),
-    ips,
-    totals: {
-      unique_ips: ips.length,
-      total_events: ips.reduce((s, x) => s + x.events, 0),
-      bans: ips.reduce((s, x) => s + x.bans, 0),
-      auth_failures: ips.reduce((s, x) => s + x.auth_failures, 0),
+    ips: [],
+    totals: { unique_ips: 0, total_events: 0, bans: 0, auth_failures: 0 },
+  };
+  const { data, live } = await apiFetch<ApiCountryDetail>(
+    `/geo/country/${upper}`,
+    fallback,
+  );
+  return {
+    data: {
+      iso2: upper,
+      iso3: iso2ToIso3(upper),
+      name: iso2ToName(upper),
+      ips: data.ips || [],
+      totals: data.totals || fallback.totals,
     },
+    live,
   };
 };
