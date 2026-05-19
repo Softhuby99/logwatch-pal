@@ -56,7 +56,22 @@ interface TooltipState {
 }
 
 const GeoAttackMap = () => {
-  const stats = useMemo(() => getCountryAttackStats(), []);
+  const { data: liveStats, loading, live } = useApiData(fetchCountryAttackStats, []);
+  const stats = useMemo<CountryAttackStat[]>(() => {
+    // Falls keine Regions vom Backend kommen, eine Pseudo-Region pro Land
+    // anlegen (unique_ips als Bubble-Größe am Country-Centroid).
+    return (liveStats ?? []).map((c) => {
+      if (c.regions && c.regions.length > 0) return c;
+      const region: RegionAttackStat = {
+        region: c.name,
+        unique_ips: Math.max(1, c.unique_ips),
+        total_events: c.total_events,
+        bans: c.bans,
+      };
+      return { ...c, regions: [region] };
+    });
+  }, [liveStats]);
+
   const statsByIso2 = useMemo(() => {
     const m = new Map<string, CountryAttackStat>();
     stats.forEach((s) => m.set(s.iso2, s));
@@ -112,14 +127,15 @@ const GeoAttackMap = () => {
 
   const top5 = stats.slice(0, 5);
 
-  // Marker-Daten: pro aktivem Land Centroid + Region-Bubbles drumherum
-  // (kleiner deterministischer Offset pro Region damit Kreise sich nicht
-  // exakt überlagern).
   const markers = useMemo(() => {
     return stats
       .map((c) => ({ stat: c, color: colorForCountry(c.iso2) }))
       .filter((m) => m.stat.regions.length > 0);
   }, [stats]);
+
+  const isEmpty = !loading && stats.length === 0;
+  void live;
+
 
   return (
     <>
