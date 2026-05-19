@@ -339,7 +339,7 @@ const IpActivityChart = ({ events, dailyFallback = [] }: Props) => {
                   ["g-act-auth", "hsl(38 92% 50%)"],
                   ["g-act-success", "hsl(142 71% 55%)"],
                   ["g-act-port", "hsl(217 91% 60%)"],
-                  ["g-act-ban", "hsl(290 70% 55%)"],
+                  ["g-act-ban", "hsl(292 84% 61%)"],
                   ["g-act-unban", "hsl(142 71% 45%)"],
                   ["g-act-crawl", "hsl(180 60% 45%)"],
                 ].map(([id, color]) => (
@@ -375,7 +375,7 @@ const IpActivityChart = ({ events, dailyFallback = [] }: Props) => {
               <Area type="monotone" dataKey="Auth Failures" stackId="1" stroke="hsl(38 92% 50%)" fill="url(#g-act-auth)" strokeWidth={1.5} />
               <Area type="monotone" dataKey="Auth Success" stackId="1" stroke="hsl(142 71% 55%)" fill="url(#g-act-success)" strokeWidth={1.5} />
               <Area type="monotone" dataKey="Port Scan" stackId="1" stroke="hsl(217 91% 60%)" fill="url(#g-act-port)" strokeWidth={1.5} />
-              <Area type="monotone" dataKey="Bans" stackId="1" stroke="hsl(290 70% 55%)" fill="url(#g-act-ban)" strokeWidth={1.5} />
+              <Area type="monotone" dataKey="Bans" stackId="1" stroke="hsl(292 84% 61%)" fill="url(#g-act-ban)" strokeWidth={2} />
               <Area type="monotone" dataKey="Unbans" stackId="1" stroke="hsl(142 71% 45%)" fill="url(#g-act-unban)" strokeWidth={1.5} />
               <Area type="monotone" dataKey="Crawl/Probe" stackId="1" stroke="hsl(180 60% 45%)" fill="url(#g-act-crawl)" strokeWidth={1.5} />
             </AreaChart>

@@ -191,24 +191,34 @@ const BanTimeline = ({ intervals, compact = false, events = [] }: Props) => {
                 onMouseEnter={() => setHoverId(iv.id)}
                 onMouseLeave={() => setHoverId(null)}
               >
-                {/* Span-Bar */}
+                {/* Span-Bar: aktiv = solid rot mit Pulse, beendet = gestreift rose */}
                 <div
-                  className={`h-4 rounded-sm border transition-all ${
+                  className={`h-3 rounded-sm border transition-all ${
                     iv.active
-                      ? "bg-red-500/30 border-red-500/60 group-hover:bg-red-500/50"
-                      : "bg-red-500/20 border-red-500/40 group-hover:bg-red-500/40"
-                  } ${isHover ? "ring-1 ring-red-400" : ""}`}
+                      ? "bg-red-500/60 border-red-400 group-hover:bg-red-500/80 animate-pulse"
+                      : "border-rose-500/50 group-hover:border-rose-400"
+                  } ${isHover ? "ring-2 ring-red-400/60 ring-offset-1 ring-offset-background" : ""}`}
+                  style={
+                    !iv.active
+                      ? {
+                          backgroundImage:
+                            "repeating-linear-gradient(45deg, hsl(0 70% 55% / 0.25) 0 4px, hsl(0 70% 55% / 0.08) 4px 8px)",
+                        }
+                      : undefined
+                  }
                 />
-                {/* Start-Marker (Ban) */}
+                {/* Start-Marker (Ban) – großer roter Punkt mit Ring */}
                 <div
-                  className="absolute -top-1 left-0 w-2 h-2 rounded-full bg-red-500 border border-background"
+                  className="absolute -top-[5px] left-0 w-3 h-3 rounded-full bg-red-500 border-2 border-background ring-1 ring-red-300 shadow-[0_0_6px_hsl(0_84%_60%/0.7)]"
                   style={{ transform: "translateX(-50%)" }}
+                  title={`Ban: ${fmtFull(iv.banned_at)}`}
                 />
-                {/* End-Marker (Unban) wenn nicht aktiv */}
+                {/* End-Marker (Unban) wenn nicht aktiv – grüner Punkt */}
                 {!iv.active && (
                   <div
-                    className="absolute -top-1 right-0 w-2 h-2 rounded-full bg-emerald-500 border border-background"
+                    className="absolute -top-[5px] right-0 w-3 h-3 rounded-full bg-emerald-500 border-2 border-background ring-1 ring-emerald-300 shadow-[0_0_6px_hsl(142_71%_45%/0.7)]"
                     style={{ transform: "translateX(50%)" }}
+                    title={`Unban: ${iv.unbanned_at}`}
                   />
                 )}
 
