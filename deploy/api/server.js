@@ -708,30 +708,109 @@ app.get("/api/ip/:ip/daily", async (req, res) => {
 });
 
 // ── GeoIP Aggregation (for map) ─────────────────────────────
+// Liefert pro Land aggregierte Angriffsstatistik (Quelle: ip_summary +
+// ip_enrichment + ip_risk_score). Nur externe IPs, letzte 30 Tage.
 app.get("/api/geo-attacks", async (_req, res) => {
   try {
     const [rows] = await pool.query(`
       SELECT
-        e.country,
-        COUNT(*) as count,
-        SUM(CASE WHEN se.ban_status = 'banning' THEN 1 ELSE 0 END) as bans,
-        MAX(se.event_time) as last_seen
-      FROM ip_enrichment e
-      JOIN security_events se ON e.ip = se.ip
-      WHERE e.country IS NOT NULL
-        AND se.event_time > NOW() - INTERVAL 30 DAY
-      GROUP BY e.country
-      ORDER BY count DESC
-      LIMIT 50
+        UPPER(e.country) AS country,
+        COUNT(DISTINCT s.ip) AS unique_ips,
+        SUM(COALESCE(s.total_events, 0)) AS total_events,
+        SUM(COALESCE(s.total_bans, 0)) AS bans,
+        SUM(COALESCE(s.total_auth_failures, 0)) AS auth_failures,
+        SUM(CASE WHEN s.last_alert_level = 'CRIT' THEN 1 ELSE 0 END) AS crit_events,
+        SUM(CASE WHEN s.last_alert_level = 'WARN' THEN 1 ELSE 0 END) AS warn_events,
+        MAX(COALESCE(r.score, 0)) AS max_risk_score,
+        MAX(s.last_seen) AS last_seen
+      FROM ip_summary s
+      JOIN ip_enrichment e ON s.ip = e.ip
+      LEFT JOIN ip_risk_score r ON s.ip = r.ip
+      WHERE e.country IS NOT NULL AND e.country <> ''
+        AND COALESCE(e.ip_scope, 'external') = 'external'
+        AND s.last_seen > NOW() - INTERVAL 30 DAY
+      GROUP BY UPPER(e.country)
+      ORDER BY bans DESC, total_events DESC
+      LIMIT 250
     `);
-    res.json(rows.map(r => ({
-      country: r.country,
-      count: Number(r.count),
-      bans: Number(r.bans),
-      last_seen: r.last_seen,
-    })));
+    res.json(rows.map(r => {
+      const events = Number(r.total_events || 0);
+      const bans = Number(r.bans || 0);
+      const crit = Number(r.crit_events || 0);
+      return {
+        country: r.country,
+        unique_ips: Number(r.unique_ips || 0),
+        total_events: events,
+        bans,
+        auth_failures: Number(r.auth_failures || 0),
+        crit_events: crit,
+        warn_events: Number(r.warn_events || 0),
+        max_risk_score: Number(r.max_risk_score || 0),
+        attack_weight: bans * 3 + crit * 2 + events,
+        last_seen: r.last_seen,
+        count: events, // legacy
+      };
+    }));
   } catch (err) {
     console.error("GET /api/geo-attacks error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── GeoIP Country Drilldown ─────────────────────────────────
+app.get("/api/geo/country/:iso2", async (req, res) => {
+  const iso2 = String(req.params.iso2 || "").toUpperCase().slice(0, 2);
+  if (!/^[A-Z]{2}$/.test(iso2)) {
+    return res.status(400).json({ error: "invalid iso2" });
+  }
+  try {
+    const [rows] = await pool.query(`
+      SELECT
+        s.ip,
+        COALESCE(s.total_events, 0) AS events,
+        COALESCE(s.total_bans, 0) AS bans,
+        COALESCE(s.total_auth_failures, 0) AS auth_failures,
+        s.last_alert_level AS last_alert,
+        s.last_seen,
+        e.country, e.asn, e.org_name, e.ptr,
+        COALESCE(r.score, 0) AS risk_score,
+        COALESCE(r.risk_level, 'LOW') AS risk_level
+      FROM ip_summary s
+      JOIN ip_enrichment e ON s.ip = e.ip
+      LEFT JOIN ip_risk_score r ON s.ip = r.ip
+      WHERE UPPER(e.country) = ?
+        AND COALESCE(e.ip_scope, 'external') = 'external'
+        AND s.last_seen > NOW() - INTERVAL 30 DAY
+      ORDER BY risk_score DESC, events DESC
+      LIMIT 500
+    `, [iso2]);
+
+    const ips = rows.map(r => ({
+      ip: r.ip,
+      events: Number(r.events),
+      bans: Number(r.bans),
+      auth_failures: Number(r.auth_failures),
+      last_alert: r.last_alert || "INFO",
+      last_seen: r.last_seen,
+      org_name: r.org_name || null,
+      asn: r.asn || null,
+      ptr: r.ptr || null,
+      risk_score: Number(r.risk_score),
+      risk_level: r.risk_level || "LOW",
+    }));
+
+    res.json({
+      iso2,
+      ips,
+      totals: {
+        unique_ips: ips.length,
+        total_events: ips.reduce((a, x) => a + x.events, 0),
+        bans: ips.reduce((a, x) => a + x.bans, 0),
+        auth_failures: ips.reduce((a, x) => a + x.auth_failures, 0),
+      },
+    });
+  } catch (err) {
+    console.error(`GET /api/geo/country/${iso2} error:`, err);
     res.status(500).json({ error: err.message });
   }
 });
