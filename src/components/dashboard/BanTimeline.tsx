@@ -380,12 +380,22 @@ const BanTimeline = ({ intervals, compact = false, events = [] }: Props) => {
                       >
                         <Ban className="h-2.5 w-2.5 mr-0.5" /> aktiv
                       </Badge>
-                    ) : (
+                    ) : iv.end_reason === "unban" ? (
                       <Badge
                         variant="outline"
                         className="text-[10px] px-1.5 font-mono bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+                        title={endReasonLabel(iv.end_reason)}
                       >
                         <ShieldOff className="h-2.5 w-2.5 mr-0.5" /> beendet
+                      </Badge>
+                    ) : (
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] px-1.5 font-mono bg-amber-500/15 text-amber-400 border-amber-500/30"
+                        title={endReasonLabel(iv.end_reason)}
+                      >
+                        <ShieldOff className="h-2.5 w-2.5 mr-0.5" />
+                        {iv.end_reason === "expired" ? "abgelaufen" : iv.end_reason === "next_ban" ? "abgelöst" : "beendet"}
                       </Badge>
                     )}
                   </td>
