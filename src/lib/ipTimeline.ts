@@ -392,7 +392,7 @@ const assembleBundle = (
     stats,
     daily: computeDaily(events),
     by_type,
-    ban_intervals: computeBanIntervals(events),
+    ban_intervals: computeBanIntervals(events, summary),
   };
 };
 
