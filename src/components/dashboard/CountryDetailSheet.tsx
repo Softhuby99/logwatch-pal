@@ -83,7 +83,12 @@ const CountryDetailSheet = ({ iso2, open, onOpenChange }: Props) => {
           )}
         </SheetHeader>
 
-        {!data || data.ips.length === 0 ? (
+        {loading && (!data || data.ips.length === 0) ? (
+          <div className="border border-border/30 rounded p-6 text-center text-xs text-muted-foreground font-mono flex items-center justify-center gap-2">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            Lade IPs …
+          </div>
+        ) : !data || data.ips.length === 0 ? (
           <div className="border border-border/30 rounded p-6 text-center text-xs text-muted-foreground font-mono">
             Keine Angriffe aus diesem Land erfasst.
           </div>
