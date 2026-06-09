@@ -18,10 +18,15 @@ async function apiFetch<T>(path: string, fallback: T): Promise<{ data: T; live: 
     const res = await fetch(`${API_BASE}${path}`, {
       signal: AbortSignal.timeout(8000),
       cache: "no-store",
-      headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+      headers: { Accept: "application/json", "Cache-Control": "no-cache", Pragma: "no-cache" },
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return { data: (await res.json()) as T, live: true };
+    const ct = res.headers.get("content-type") || "";
+    const text = await res.text();
+    if (!ct.toLowerCase().includes("application/json") || text.trimStart().startsWith("<")) {
+      throw new Error(`Non-JSON response from ${path} (content-type=${ct})`);
+    }
+    return { data: JSON.parse(text) as T, live: true };
   } catch {
     return { data: fallback, live: false };
   }
