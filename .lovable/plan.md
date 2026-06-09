@@ -1,64 +1,46 @@
-## Problem
+## Ziel
+Frontend-Dashboard zeigt zuverlässig die echten Werte der API (`/api/stats`, `/api/attack-timeline`, …) an, statt stillschweigend Fallback-/Mock-Daten zu rendern, wenn `/api/...` HTML zurückliefert (Vite-Preview, falsch konfigurierter Proxy).
 
-In der Demo werden Bans korrekt als "aktiv" und "beendet" dargestellt, weil die Mock-Daten zu jedem `ban`-Event ein passendes `unban`-Event enthalten. `computeBanIntervals` in `src/lib/ipTimeline.ts` paart diese Paare und setzt `active=false` + `unbanned_at`.
+## Bestätigte Fakten aus dem Server
+- API läuft auf `deploy-api-1`, Port **3001** (intern + Host-Mapping `127.0.0.1:3001`).
+- `/api/stats` und `/api/attack-timeline` liefern valides JSON (z. B. `auth_failures.value = 18`, `h24 = 9`).
+- Container ist trotzdem als **unhealthy** markiert → Healthcheck im Compose ruft vermutlich noch Port 3000/falschen Pfad auf (außerhalb des Frontend-Scopes, nur Hinweis).
+- DB: `deploy-db-1` (Postgres 16, healthy).
+- Proxy: `deploy-proxy-1` (nginx) bedient 80/443 – aktuell ohne `/api`-Upstream auf `api:3001`.
 
-In der Live-Umgebung sehen wir nie ein "beendet", weil die Pipeline (Loki/Promtail → MySQL) zwar `ban_status='banning'` schreibt, aber **keine korrespondierenden `unbanning`-Events** in `security_events` ankommen. Belege:
+## Frontend-Änderungen (umzusetzen)
 
-- In `deploy/api/server.js` wird ausschließlich `ban_status = 'banning'` gezählt — kein einziges `unbanning` wird gelesen oder zurückgegeben.
-- Die Tabelle `ip_summary` hat dagegen ein Feld `current_status` ('banned' / 'clean' …), das den aktuellen Zustand abbildet.
-- Folge: Alle Live-Intervalle laufen im Frontend in den `openBans`-Zweig und werden als `active=true` gerendert → durchgehend rot.
+### 1. Einheitliche API-Basis
+- Alle Calls gehen über einen zentralen Helper in `src/lib/api.ts`.
+- Basis: `import.meta.env.VITE_API_URL || "/api"`.
+- Komponenten dürfen keine eigenen `fetch("/api/...")`-Pfade mehr zusammensetzen, nur Helper-Funktionen (`getStats()`, `getAttackTimeline()`, `getGeoAttacks()`, `getSecurityEvents()` …).
 
-## Lösung
+### 2. HTML-Erkennung & harte Fehlschläge
+Im Helper:
+- Response prüfen: `content-type` enthält `application/json` UND Body beginnt nicht mit `<`.
+- Bei HTML / Nicht-JSON / `!res.ok`: `throw new ApiError(...)` statt Mock-Daten zurückzugeben.
+- Aufrufende Hooks (React Query) gehen sauber in `error`-State, UI zeigt klar „Offline / API nicht erreichbar".
 
-Drei Bausteine, vom Frontend her ohne Backend-Ingestion-Änderung umsetzbar:
+### 3. Live-/Fallback-Sichtbarkeit
+- Bestehendes `live: boolean`-Flag durchgängig nutzen.
+- Header bekommt einen einzigen Statusindikator: grün „Live" (alle Kern-Endpoints OK), gelb „Teilweise", rot „Offline (Fallback)".
+- Karten/Charts zeigen bei `error` einen kleinen „API offline" Hinweis statt stiller Demo-Zahlen.
 
-### 1. Diagnose-Endpoint (klein, optional, hilft Verifikation)
-Im API-Server kurzes Logging / einen Counter, wie viele `unbanning`-Events pro IP in `security_events` existieren. Wenn das wirklich 0 ist, ist der nächste Schritt nötig.
+### 4. Dev-/Preview-Konfiguration
+- `vite.config.ts`: Dev-Proxy `'/api' -> process.env.VITE_API_PROXY_TARGET || 'http://127.0.0.1:3001'`, `changeOrigin: true`.
+- `.env.example` mit `VITE_API_URL=/api` und Kommentar zu `VITE_API_PROXY_TARGET` für lokale Entwicklung.
+- In der Lovable-Preview (kein Zugriff auf private Host-API) sorgt Schritt 2 dafür, dass die UI ehrlich „Offline" anzeigt, statt Fantasiezahlen zu rendern.
 
-### 2. Heuristisches Ableiten des Ban-Endes im Frontend
-`computeBanIntervals` in `src/lib/ipTimeline.ts` so erweitern, dass ein offener Ban automatisch als **beendet** markiert wird, sobald eine der folgenden Bedingungen zutrifft:
+### 5. Validierung nach Umbau
+- In Browser-Preview: Netzwerk-Tab prüfen → `/api/stats` Response = HTML → UI zeigt „Offline".
+- Auf der Server-VM (`https://<host>` über nginx, sobald Proxy `/api → api:3001` eingerichtet ist): Karten zeigen exakt die curl-Werte (`security_events 1010 / 49 / 262 / 1010`, `auth_failures 18 / 9 / 14 / 18` etc.).
+- Dashboard-Versionsnummer in `src/pages/Index.tsx` um eine Minor-Stelle erhöhen (gemäß Projektregel).
 
-a. **Folge-Ban**: Tritt nach einem offenen Ban derselben IP ein *neuer* `ban`-Event auf, wird der vorige Ban auf `unbanned_at = neuer ban.event_time` gesetzt (`active=false`, Grund: "implizit beendet — neuer Ban folgte"). Das deckt die häufigste Realität ab (CrowdSec/Fail2Ban verlängert/erneuert Bans regelmäßig).
+## Bewusst NICHT enthalten
+- Änderungen an Auth/OIDC.
+- Neue API-Endpoints – alle benötigten Daten liefert die API bereits.
+- Server-/Compose-/nginx-Änderungen (Healthcheck, `/api`-Upstream) – das sind separate Ops-Schritte, die du auf der VM ausführst:
+  - Healthcheck im Compose auf `wget -qO- http://127.0.0.1:3001/api/stats` umstellen.
+  - nginx-Proxy: `location /api/ { proxy_pass http://api:3001; }`.
 
-b. **Konfigurierbare Default-Bandauer** (z. B. 4 h für CrowdSec, 10 min für Fail2Ban) als Fallback: Wenn der letzte Ban älter ist als diese Dauer **und** `ip_summary.current_status !== 'banned'`, wird er ebenfalls als beendet markiert (`unbanned_at = banned_at + duration`, Grund: "abgelaufen").
-
-c. **`current_status`-Override**: Nur der allerletzte offene Ban darf `active=true` bleiben, und auch nur, wenn `summary.current_status === 'banned'`. Sonst → beendet auf `summary.last_seen` (oder jetzt).
-
-### 3. UI-Hinweis in `BanTimeline.tsx`
-Tooltip/Label um den Grund erweitern: "aktiv", "beendet (Unban-Event)", "beendet (neuer Ban folgte)", "beendet (abgelaufen)". Damit ist optisch und semantisch sofort klar, *warum* der Ban als beendet gilt — auch wenn kein explizites Unban-Event existiert.
-
-## Geänderte Dateien
-
-- `src/lib/ipTimeline.ts` — `computeBanIntervals` erweitert, `BanInterval` bekommt Feld `end_reason: "unban" | "next_ban" | "expired" | "status_clean" | null`.
-- `src/components/dashboard/BanTimeline.tsx` — Tooltip + visuelle Differenzierung der Endgründe (grüner Marker für echten Unban, gelber/grauer Marker für abgeleitet beendete Bans).
-- `src/components/dashboard/IpDetailView.tsx` — `summary.current_status` und `summary.last_seen` an `buildIpTimelineBundle` durchreichen (Parameter-Erweiterung).
-- `deploy/api/server.js` (optional, Diagnose) — Im `/api/ip/:ip/events`-Response auch die Anzahl `unbanning`-Events mitliefern und kurz loggen.
-- `src/pages/Index.tsx` — Version auf **v0.8** anheben.
-
-## Technische Details
-
-`BanInterval` neu:
-```ts
-end_reason: "unban" | "next_ban" | "expired" | "status_clean" | null;
-```
-
-`buildIpTimelineBundle(ip, sec, auth, summary, enrichment, risk)` reicht `summary` an `computeBanIntervals(events, summary)` weiter. Die Heuristik wird *nur* angewendet, wenn die normale Unban-Paarung (a) kein Ergebnis bringt, damit echte Unban-Events Vorrang behalten.
-
-Default-Bandauer-Konstanten:
-```ts
-const DEFAULT_BAN_DURATION_MS: Record<string, number> = {
-  crowdsec: 4 * 60 * 60 * 1000,     // 4h
-  netfilter: 10 * 60 * 1000,        // 10min (mailcow/fail2ban)
-  default: 60 * 60 * 1000,          // 1h
-};
-```
-
-## Deployment
-
-```bash
-cd /opt/dashboard && sudo git pull && cd deploy && \
-sudo docker compose build api dashboard && \
-sudo docker compose up -d api dashboard
-```
-
-Danach im Browser **Strg+Shift+R**.
+Sag „go", dann setze ich die Frontend-Schritte 1–5 um.
